@@ -1,0 +1,12 @@
+---
+name: CIFAR10
+root_dir: /datasets/CIFAR10
+local_root_dir: /Users/lorenzosani/datasets/CIFAR10
+load_centralised:
+  _target_: cifar10_utils.load_data
+  batch_size: 32
+create_lda_partitions:
+  _target_: cifar10_utils.create_lda_cifar10_partitions
+  seed: 51550
+load_client_dataset:
+  _target_: cifar10_utils.load_partitioned_data

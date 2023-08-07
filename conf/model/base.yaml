@@ -1,0 +1,4 @@
+---
+name: base
+init_model_fn: 
+  _target_: model.get_network_generator_resnet

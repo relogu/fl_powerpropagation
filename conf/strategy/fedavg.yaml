@@ -1,0 +1,8 @@
+---
+name: FedAvg
+init:
+  _target_: flwr.server.strategy.FedAvg
+  initial_parameters: null
+  evaluate_metrics_aggregation_fn: wandb_utils.aggregate_weighted_average
+  accept_failures: True
+eta_l: 0.0001 # client's learning rate

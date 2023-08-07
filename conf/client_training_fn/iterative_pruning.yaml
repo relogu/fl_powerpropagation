@@ -1,0 +1,6 @@
+---
+name: iterative_pruning
+training_fn:
+  _target_: train.get_iterative_train_and_prune
+  amount: 0.3
+  pruning_method: 'l1'

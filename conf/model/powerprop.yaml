@@ -1,0 +1,5 @@
+---
+name: powerprop
+init_model_fn: 
+  _target_: model.get_network_generator_resnet_powerprop
+  alpha: 2.0

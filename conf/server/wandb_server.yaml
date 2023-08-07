@@ -1,0 +1,6 @@
+---
+name: WandbServer
+init:
+  _target_: wandb_utils.WandbServer
+  client_manager: 
+    _target_: flwr.server.client_manager.SimpleClientManager

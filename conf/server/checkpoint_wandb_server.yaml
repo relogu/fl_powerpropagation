@@ -1,0 +1,6 @@
+---
+name: CheckpointWandbServer
+init:
+  _target_: wandb_utils.CheckpointWandbServer
+  client_manager: 
+    _target_: flwr.server.client_manager.SimpleClientManager

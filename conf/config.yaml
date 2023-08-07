@@ -1,0 +1,20 @@
+gen_federated_partitions: create_lda_cifar10_partitions
+# gen_on_fit_config_fn: ???
+# get_initial_parameters_fn: ???
+# get_ray_client_fn: ???
+server_address: locahost:50051
+is_simulation: True
+is_local: False
+num_rounds: 100
+local_epochs: 1
+
+defaults:
+  - _self_
+  - client_training_fn: base  #"relreps"
+  - dataset: "cifar10"
+  - fl_setting: "cross_silo"
+  - ray_config: base
+  - server: "checkpoint_wandb_server"
+  - strategy: "fedavg"
+  - wandb: base
+  - model: base
