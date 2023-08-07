@@ -1,0 +1,12 @@
+# Python cache
+__pycache__
+
+# Slurm outputs
+slurm-*
+
+# Weights&Biases output directory
+wandb
+
+# Hydra output directories
+multirun
+outputs
