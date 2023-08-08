@@ -1,14 +1,13 @@
-from typing import Tuple, Callable, Dict
 from pathlib import Path
+from typing import Callable, Dict, Tuple
 
 import torch
+from cifar10_utils import load_centralised_test_set
+from flwr.common import Scalar
 from torch import nn
 from torch.nn import Module
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from flwr.common import Scalar
 
-from cifar10_utils import load_centralised_test_set
 
 def test(
     net: Module,
@@ -31,21 +30,22 @@ def test(
             loss += criterion(outputs, labels).item()
             _, predicted = torch.max(outputs.data, 1)  # pylint: disable=no-member
             correct += (predicted == labels).sum().item()
-    
-    return loss / total, {'accuracy': correct / total}
+
+    return loss / total, {"accuracy": correct / total}
+
 
 def centralised_evaluate(
     partition_root: Path,
     net: Module,
-    device: str = 'cpu',  # pylint: disable=no-member
+    device: str = "cpu",  # pylint: disable=no-member
     batch_size: int = 32,
-    test_loop: Callable[[Module, DataLoader, str], Tuple[float, Dict[str, Scalar]]] = test,
+    test_loop: Callable[
+        [Module, DataLoader, str], Tuple[float, Dict[str, Scalar]]
+    ] = test,
 ) -> Tuple[float, Dict[str, Scalar]]:
     # Load the test set
-    testset, testloader, n_samples = load_centralised_test_set(partition_root, batch_size)
-    # Evaluate the model
-    return test_loop(
-        net=net,
-        testloader=testloader,
-        device=device
+    testset, testloader, n_samples = load_centralised_test_set(
+        partition_root, batch_size
     )
+    # Evaluate the model
+    return test_loop(net=net, testloader=testloader, device=device)

@@ -1,18 +1,18 @@
-import timeit
 import numbers
-from logging import INFO
-from typing import Optional, List, Tuple, Dict
-from collections import defaultdict
-from pathlib import Path
 import pickle
-import wandb
+import timeit
+from collections import defaultdict
+from logging import INFO
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
-from flwr.server import Server, History
+import wandb
+from flwr.common import Parameters
 from flwr.common.logger import log
+from flwr.server import History, Server
 from flwr.server.client_manager import ClientManager
 from flwr.server.strategy import FedAvg, Strategy
 
-from flwr.common import Parameters
 
 def aggregate_weighted_average(metrics: List[Tuple[int, dict]]) -> dict:
     """Generic function to combine results from multiple clients
@@ -47,86 +47,99 @@ def log_history_to_wandb(history: History):
     """Log the received `history` object to Weights and Biases."""
     wandb_dict = {
         # The losses in the history object are stored in the form of a list of tuples: (server_round, loss).
-        'losses_distributed': history.losses_distributed[-1][1] if len(history.losses_distributed) > 0 else 0,
-        'losses_centralized': history.losses_centralized[-1][1] if len(history.losses_centralized) > 0 else 0,
+        "losses_distributed": history.losses_distributed[-1][1]
+        if len(history.losses_distributed) > 0
+        else 0,
+        "losses_centralized": history.losses_centralized[-1][1]
+        if len(history.losses_centralized) > 0
+        else 0,
     }
     # NOTE: the `Strategy` has to aggregate the metrics through the `aggregate_fit` and
     # the `aggregate_evaluate`. The distributed metrics then contain the aggregated
     # metrics in the form of a list of tuples (server_round, aggregated_metric).
     # For better understanding the composition of the History object, see its
     # implementation.
-    wandb_dict.update({
-        f'{key}_distributed_fit': val[-1][1]
-        # key -> metric name, val -> list of tuples (server_round, aggregated_metric)
-        for key, val in history.metrics_distributed_fit.items()
-    })
-    wandb_dict.update({
-        f'{key}_metrics_distributed': val[-1][1]
-        # key -> metric name, val -> list of tuples (server_round, aggregated_metric)
-        for key, val in history.metrics_distributed.items()
-    })
-    wandb_dict.update({
-        f'{key}_metrics_centralized': val[-1][1]
-        # key -> metric name, val -> list of tuples (server_round, aggregated_metric)
-        for key, val in history.metrics_centralized.items()
-    })
+    wandb_dict.update(
+        {
+            f"{key}_distributed_fit": val[-1][1]
+            # key -> metric name, val -> list of tuples (server_round, aggregated_metric)
+            for key, val in history.metrics_distributed_fit.items()
+        }
+    )
+    wandb_dict.update(
+        {
+            f"{key}_metrics_distributed": val[-1][1]
+            # key -> metric name, val -> list of tuples (server_round, aggregated_metric)
+            for key, val in history.metrics_distributed.items()
+        }
+    )
+    wandb_dict.update(
+        {
+            f"{key}_metrics_centralized": val[-1][1]
+            # key -> metric name, val -> list of tuples (server_round, aggregated_metric)
+            for key, val in history.metrics_centralized.items()
+        }
+    )
     # Log metrics to wandb
     wandb.log(wandb_dict)
 
+
 def dump_history_to_files(history: History, root_path: str):
     """Dump the received `history` object to files in the `root_path`."""
-    with open(Path(root_path, 'losses_distributed.pkl'), 'wb') as f:
+    with open(Path(root_path, "losses_distributed.pkl"), "wb") as f:
         pickle.dump(history.losses_distributed, f)
-    with open(Path(root_path, 'losses_centralized.pkl'), 'wb') as f:
+    with open(Path(root_path, "losses_centralized.pkl"), "wb") as f:
         pickle.dump(history.losses_centralized, f)
-    with open(Path(root_path, 'metrics_distributed_fit.pkl'), 'wb') as f:
+    with open(Path(root_path, "metrics_distributed_fit.pkl"), "wb") as f:
         pickle.dump(history.metrics_distributed_fit, f)
-    with open(Path(root_path, 'metrics_distributed.pkl'), 'wb') as f:
+    with open(Path(root_path, "metrics_distributed.pkl"), "wb") as f:
         pickle.dump(history.metrics_distributed, f)
-    with open(Path(root_path, 'metrics_centralized.pkl'), 'wb') as f:
+    with open(Path(root_path, "metrics_centralized.pkl"), "wb") as f:
         pickle.dump(history.metrics_centralized, f)
     # Save files to wandb
-    wandb.save('losses_distributed.pkl', policy="now")
-    wandb.save('losses_centralized.pkl', policy="now")
-    wandb.save('metrics_distributed_fit.pkl', policy="now")
-    wandb.save('metrics_distributed.pkl', policy="now")
-    wandb.save('metrics_centralized.pkl', policy="now")
+    wandb.save("losses_distributed.pkl", policy="now")
+    wandb.save("losses_centralized.pkl", policy="now")
+    wandb.save("metrics_distributed_fit.pkl", policy="now")
+    wandb.save("metrics_distributed.pkl", policy="now")
+    wandb.save("metrics_centralized.pkl", policy="now")
+
 
 def load_history_from_files(root_path: str):
     """Load an `history` object from files in the `root_path`."""
     history = History()
     # Restoring files from wandb
-    wandb.restore('losses_distributed.pkl')
-    wandb.restore('losses_centralized.pkl')
-    wandb.restore('metrics_distributed_fit.pkl')
-    wandb.restore('metrics_distributed.pkl')
-    wandb.restore('metrics_centralized.pkl')
-    with open(Path(root_path, 'losses_distributed.pkl'), 'rb') as f:
+    wandb.restore("losses_distributed.pkl")
+    wandb.restore("losses_centralized.pkl")
+    wandb.restore("metrics_distributed_fit.pkl")
+    wandb.restore("metrics_distributed.pkl")
+    wandb.restore("metrics_centralized.pkl")
+    with open(Path(root_path, "losses_distributed.pkl"), "rb") as f:
         history.losses_distributed = pickle.load(f)
-    with open(Path(root_path, 'losses_centralized.pkl'), 'rb') as f:
+    with open(Path(root_path, "losses_centralized.pkl"), "rb") as f:
         history.losses_centralized = pickle.load(f)
-    with open(Path(root_path, 'metrics_distributed_fit.pkl'), 'rb') as f:
+    with open(Path(root_path, "metrics_distributed_fit.pkl"), "rb") as f:
         history.metrics_distributed_fit = pickle.load(f)
-    with open(Path(root_path, 'metrics_distributed.pkl'), 'rb') as f:
+    with open(Path(root_path, "metrics_distributed.pkl"), "rb") as f:
         history.metrics_distributed = pickle.load(f)
-    with open(Path(root_path, 'metrics_centralized.pkl'), 'rb') as f:
+    with open(Path(root_path, "metrics_centralized.pkl"), "rb") as f:
         history.metrics_centralized = pickle.load(f)
     return history
 
+
 def dump_server_state_to_file(server_state: Dict, root_path: str):
     """Dump the received `server_state` object to files in the `root_path`."""
-    with open(Path(root_path, 'server_state.pkl'), 'wb') as f:
+    with open(Path(root_path, "server_state.pkl"), "wb") as f:
         pickle.dump(server_state, f)
-    wandb.save('server_state.pkl', policy="now")
+    wandb.save("server_state.pkl", policy="now")
+
 
 def load_server_state_from_file(root_path: str):
     """Load the `server_state` object from files in the `root_path`."""
-    wandb.restore('server_state.pkl')
-    with open(Path(root_path, 'server_state.pkl'), 'rb') as f:
+    wandb.restore("server_state.pkl")
+    with open(Path(root_path, "server_state.pkl"), "rb") as f:
         server_state = pickle.load(f)
     return server_state
-        
-    
+
 
 class WandbServer(Server):
     """WandbServer extends the Flower Server to log metrics to Weights and Biases."""
@@ -134,7 +147,7 @@ class WandbServer(Server):
     def __repr__(self) -> str:
         rep = f"WandbServer(client_manager={self._client_manager}, strategy={self.strategy}, strategy.evaluate_metrics_aggregation_fn={self.strategy.evaluate_metrics_aggregation_fn})"
         return rep
-    
+
     # pylint: disable=too-many-locals
     def fit(self, num_rounds: int, timeout: Optional[float]) -> History:
         """Run federated averaging for a number of rounds."""
@@ -220,9 +233,11 @@ class CheckpointWandbServer(Server):
         parameters: Parameters = None,
     ) -> None:
         self._client_manager: ClientManager = client_manager
-        self.parameters: Parameters = Parameters(
-            tensors=[], tensor_type="numpy.ndarray"
-        ) if parameters is None else parameters
+        self.parameters: Parameters = (
+            Parameters(tensors=[], tensor_type="numpy.ndarray")
+            if parameters is None
+            else parameters
+        )
         self.strategy: Strategy = strategy if strategy is not None else FedAvg()
         self.max_workers: Optional[int] = None
         self.resume = resume
@@ -262,10 +277,10 @@ class CheckpointWandbServer(Server):
             history = load_history_from_files(wandb.run.dir)
             # Load server state from checkpoint
             server_state = load_server_state_from_file(wandb.run.dir)
-            self.parameters = server_state['model_parameters']
-            start_round = server_state['server_round']
-            start_time = timeit.default_timer() + server_state['elapsed_time']
-            
+            self.parameters = server_state["model_parameters"]
+            start_round = server_state["server_round"]
+            start_time = timeit.default_timer() + server_state["elapsed_time"]
+
         for current_round in range(start_round, num_rounds + 1):
             # Train model and replace previous global model
             res_fit = self.fit_round(
@@ -314,9 +329,9 @@ class CheckpointWandbServer(Server):
             dump_history_to_files(history, wandb.run.dir)
             # Save checkpoint
             server_state = {
-                'server_round': current_round,
-                'elapsed_time': timeit.default_timer() - start_time,
-                'model_parameters': self.parameters,
+                "server_round": current_round,
+                "elapsed_time": timeit.default_timer() - start_time,
+                "model_parameters": self.parameters,
             }
             dump_server_state_to_file(server_state, wandb.run.dir)
 

@@ -1,16 +1,15 @@
 import pickle
 from pathlib import Path
-from typing import Optional, Union, Dict, Tuple, List
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-from numpy.random import BitGenerator, Generator, SeedSequence
 import torch
+from lda_utils import create_lda_partitions
+from numpy.random import BitGenerator, Generator, SeedSequence
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset, ConcatDataset
+from torch.utils.data import ConcatDataset, DataLoader, Dataset
 from torchvision.datasets import CIFAR10
 from torchvision.transforms import Compose, Normalize, ToTensor
-
-from lda_utils import create_lda_partitions
 
 CIFAR10_DATA_ROOT = "/datasets/CIFAR10"
 
@@ -34,7 +33,7 @@ def create_lda_cifar10_partitions(
     num_partitions: int = 100,
     concentration: float = 0.5,
     seed: Optional[Union[int, SeedSequence, BitGenerator, Generator]] = None,
-    ) -> List[str]:
+) -> List[str]:
     """Create imbalanced non-iid partitions using Latent Dirichlet Allocation
     (LDA) without resampling for the CIFAR10 dataset. The dataset is loaded
     from the `root_dir` directory. Note that the dataset will be
@@ -67,12 +66,12 @@ def create_lda_cifar10_partitions(
     Returns:
         List[str]: list of strings containing the paths to the partitions.
     """
-    
+
     # Set the partition root
     partition_root = (
         Path(root_dir) / "lda" / f"{num_partitions}" / f"{concentration:.2f}"
     )
-    
+
     # Check whether the partition exists
     if partition_root.is_dir():
         print("Partitions already exist. Delete if necessary.")
@@ -103,11 +102,11 @@ def create_lda_cifar10_partitions(
             accept_imbalanced=True,
             seed=seed,
         )
-        
+
         # Cast test features and labels into numpy arrays to be used by LDA utilities
         x = np.array(testset.data)
         y = np.array(testset.targets)
-        
+
         # Create LDA partitions for test set and from the previous distributions
         test_clients_partitions, _ = create_lda_partitions(
             dataset=(x, y),
@@ -186,7 +185,7 @@ def load_partitioned_data(
     )
     # Instantiate the test loader
     testloader = DataLoader(testset, batch_size=batch_size, shuffle=False)
-    
+
     # Get the number of examples by set
     num_examples = {"trainset": len(trainset), "testset": len(testset)}
     # Return the loaders and the number of examples
@@ -199,12 +198,12 @@ def load_centralised_test_set(
 ) -> Tuple[DataLoader, DataLoader, Dict]:
     """Load the centralised test set from the specified root directory.
     The centralised test set is intended to be composed of the concatenation
-    of the local test sets of clients. The function will load all the 
+    of the local test sets of clients. The function will load all the
     `test.pickle` files from the directory specified by `partitions_root`.
-    The files are expected to exist. The `partitions_root` folder should 
+    The files are expected to exist. The `partitions_root` folder should
     contain one folder for each client, and each of these folders should
     contain a `test.pickle` file.
-    
+
 
     Args:
         partitions_root (Path): the path to the root directory containing the partitions.
@@ -260,24 +259,32 @@ class CustomTensorDataset(Dataset):
     def __len__(self):
         return self.tensors[0].size(0)
 
+
 if __name__ == "__main__":
     import os
+
     print("Running cifar10_utils.py script as a main file.")
-    print(f"The dataset will be downloaded at {CIFAR10_DATA_ROOT} and partitioned in the same folder.")
-    print("The download will be skipped if the dataset is already present in the folder.")
-    print("The script will use LDA to partition the dataset, with the default parameters: number of clients = 100, concentration = 0.5, and seed = 51550.")
-    
+    print(
+        f"The dataset will be downloaded at {CIFAR10_DATA_ROOT} and partitioned in the same folder."
+    )
+    print(
+        "The download will be skipped if the dataset is already present in the folder."
+    )
+    print(
+        "The script will use LDA to partition the dataset, with the default parameters: number of clients = 100, concentration = 0.5, and seed = 51550."
+    )
+
     response = input("Do you want to change the default parameters? [y/n] ")
-    
+
     n, alpha, seed = 100, 0.5, 51550
-    
+
     if response == "y":
         n = int(input("Set the number of clients"))
         alpha = float(input("Set the concentration parameter"))
         seed = int(input("Set the seed"))
-    
+
     response = input("Do you want to continue downloading and partitioning? [y/n] ")
-    
+
     if response == "y":
         print("Downloading the dataset...")
         load_data()

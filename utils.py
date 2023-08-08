@@ -6,7 +6,10 @@ import numpy as np
 import torch
 from flwr.common import NDArrays
 
-def compute_model_delta(trained_parameters: NDArrays, og_parameters: NDArrays) -> NDArrays:
+
+def compute_model_delta(
+    trained_parameters: NDArrays, og_parameters: NDArrays
+) -> NDArrays:
     """Compute the layer-wise difference between two lists of parameters.
 
     Args:
@@ -28,6 +31,7 @@ def compute_norm(update: NDArrays) -> float:
     norm_sum = np.sum(summed_update)
     norm = np.sqrt(norm_sum)
     return norm
+
 
 def get_device() -> str:
     """Determine which device to use for PyTorch.

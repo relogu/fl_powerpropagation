@@ -11,8 +11,6 @@ import wandb_utils
 from simple_client import CifarClient
 from utils import get_device
 
-import tensorboardX as tensorboard
-
 @hydra.main(version_base=None, config_path="./conf", config_name="config")
 def my_app(cfg: DictConfig) -> None:
     print(OmegaConf.to_yaml(cfg))
