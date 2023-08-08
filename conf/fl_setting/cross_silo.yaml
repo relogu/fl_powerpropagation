@@ -10,6 +10,6 @@ batch_size: 32
 local_eval: True
 centralised_eval: True
 evaluate_fn:
-  _target_: test.centralised_evaluate
+  _target_: test_fn.centralised_evaluate
 test_loop:
-  _target_: test.test
+  _target_: test_fn.test
