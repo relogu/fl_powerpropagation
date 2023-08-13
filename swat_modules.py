@@ -46,39 +46,57 @@ class swat_linear(Function):
 
 
 def convolution_backward(
+    ctx,
     grad_output,
-    input,
-    weight,
-    bias,
-    stride,
-    padding,
-    dilation,
-    groups,
 ):
+    input, weight, bias = ctx.saved_tensors
+    conf = ctx.conf
+    input_grad = (
+        weight_grad
+    ) = (
+        bias_grad
+    ) = (
+        sparsity_grad
+    ) = (
+        grad_in_th
+    ) = grad_out_th = stride_grad = padding_grad = dilation_grad = groups_grad = None
     # Compute gradient w.r.t. input
-    grad_input = F.conv2d(
-        input.transpose(0, 1),
-        grad_output.transpose(0, 1),
-        None,
-        stride,
-        padding,
-        dilation,
-        groups,
-    ).transpose(0, 1)
+    if ctx.needs_input_grad[0]:
+        input_grad = torch.nn.grad.conv2d_input(
+            input.shape,
+            weight,
+            grad_output,
+            conf["stride"],
+            conf["padding"],
+            conf["dilation"],
+            conf["groups"],
+        )
     # Compute gradient w.r.t. weight
-    grad_weight = F.conv_transpose2d(
-        grad_output,
-        weight,
-        None,
-        stride,
-        padding,
-        0,
-        dilation,
-        groups,
-    )
+    if ctx.needs_input_grad[1]:
+        weight_grad = torch.nn.grad.conv2d_weight(
+            input,
+            weight.shape,
+            grad_output,
+            conf["stride"],
+            conf["padding"],
+            conf["dilation"],
+            conf["groups"],
+        )
     # Compute gradient w.r.t. bias (works for every Conv2d shape)
-    grad_bias = grad_output.sum(dim=(0, 2, 3))
-    return grad_weight, grad_input, grad_bias
+    if bias is not None and ctx.needs_input_grad[2]:
+        bias_grad = grad_output.sum(dim=(0, 2, 3))
+    return (
+        input_grad,
+        weight_grad,
+        bias_grad,
+        sparsity_grad,
+        grad_in_th,
+        grad_out_th,
+        stride_grad,
+        padding_grad,
+        dilation_grad,
+        groups_grad,
+    )
 
 
 class swat_conv2d_unstructured(Function):
@@ -121,26 +139,12 @@ class swat_conv2d_unstructured(Function):
             "groups": groups,
         }
         return output, in_threshold, out_threshold
-    
+
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
     @once_differentiable
     def backward(ctx, grad_output, grad_in_th, grad_out_th):
-        # TODO
-        input, weight, bias = ctx.saved_tensors
-        conf = ctx.conf
-        input_grad = weight_grad = bias_grad = sparsity_grad = grad_in_th = grad_out_th = stride_grad = padding_grad = dilation_grad = groups_grad =  None
-        # Compute gradient w.r.t. input
-        if ctx.needs_input_grad[0]:
-            input_grad = torch.nn.grad.conv2d_input(input.shape, weight, grad_output, conf["stride"], conf["padding"], conf["dilation"], conf["groups"])
-        # Compute gradient w.r.t. weight
-        if ctx.needs_input_grad[1]:
-            weight_grad = torch.nn.grad.conv2d_weight(input, weight.shape, grad_output, conf["stride"], conf["padding"], conf["dilation"], conf["groups"])
-        # Compute gradient w.r.t. bias (works for every Conv2d shape)
-        if bias is not None and ctx.needs_input_grad[2]:
-            bias_grad = grad_output.sum(dim=(0, 2, 3))
-        return input_grad, weight_grad, bias_grad, sparsity_grad, grad_in_th, grad_out_th, stride_grad, padding_grad, dilation_grad, groups_grad
-
+        return convolution_backward(ctx, grad_output)
 
 
 class swat_conv2d_structured_channel(Function):
@@ -179,26 +183,12 @@ class swat_conv2d_structured_channel(Function):
             "groups": groups,
         }
         return output, out_threshold
-    
+
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
     @once_differentiable
     def backward(ctx, grad_output, grad_out_th):
-        # TODO
-        input, weight, bias = ctx.saved_tensors
-        conf = ctx.conf
-        input_grad = weight_grad = bias_grad = sparsity_grad = grad_out_th = stride_grad = padding_grad = dilation_grad = groups_grad =  None
-        # Compute gradient w.r.t. input
-        if ctx.needs_input_grad[0]:
-            input_grad = torch.nn.grad.conv2d_input(input.shape, weight, grad_output, conf["stride"], conf["padding"], conf["dilation"], conf["groups"])
-        # Compute gradient w.r.t. weight
-        if ctx.needs_input_grad[1]:
-            weight_grad = torch.nn.grad.conv2d_weight(input, weight.shape, grad_output, conf["stride"], conf["padding"], conf["dilation"], conf["groups"])
-        # Compute gradient w.r.t. bias (works for every Conv2d shape)
-        if bias is not None and ctx.needs_input_grad[2]:
-            bias_grad = grad_output.sum(dim=(0, 2, 3))
-        return input_grad, weight_grad, bias_grad, sparsity_grad, grad_out_th, stride_grad, padding_grad, dilation_grad, groups_grad
-
+        return convolution_backward(ctx, grad_output)
 
 
 class swat_conv2d_structured_filter(Function):
@@ -237,25 +227,12 @@ class swat_conv2d_structured_filter(Function):
             "groups": groups,
         }
         return output, out_threshold
-    
+
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
     @once_differentiable
     def backward(ctx, grad_output, grad_out_th):
-        # TODO
-        input, weight, bias = ctx.saved_tensors
-        conf = ctx.conf
-        input_grad = weight_grad = bias_grad = sparsity_grad = grad_out_th = stride_grad = padding_grad = dilation_grad = groups_grad =  None
-        # Compute gradient w.r.t. input
-        if ctx.needs_input_grad[0]:
-            input_grad = torch.nn.grad.conv2d_input(input.shape, weight, grad_output, conf["stride"], conf["padding"], conf["dilation"], conf["groups"])
-        # Compute gradient w.r.t. weight
-        if ctx.needs_input_grad[1]:
-            weight_grad = torch.nn.grad.conv2d_weight(input, weight.shape, grad_output, conf["stride"], conf["padding"], conf["dilation"], conf["groups"])
-        # Compute gradient w.r.t. bias (works for every Conv2d shape)
-        if bias is not None and ctx.needs_input_grad[2]:
-            bias_grad = grad_output.sum(dim=(0, 2, 3))
-        return input_grad, weight_grad, bias_grad, sparsity_grad, grad_out_th, stride_grad, padding_grad, dilation_grad, groups_grad
+        return convolution_backward(ctx, grad_output)
 
 
 class SWATLinear(nn.Module):
