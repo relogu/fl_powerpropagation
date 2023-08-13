@@ -1,4 +1,4 @@
-from logging import ERROR
+from logging import ERROR, INFO, DEBUG
 from typing import Callable, Dict
 
 import torch
@@ -27,18 +27,24 @@ def train(
     criterion = nn.CrossEntropyLoss()
     for epoch in range(1, epochs + 1):
         for data in trainloader:
+            # log(DEBUG, f"Get data")
             images, labels = data[0].to(device), data[1].to(device)
 
+            # log(DEBUG, f"Zeroing gradients")
             # zero the parameter gradients
             optimizer.zero_grad()
 
+            # log(DEBUG, f"Forward pass")
             # forward + backward + optimize
             outputs = net(images)
+            # log(DEBUG, f"Computing loss")
             loss = criterion(outputs, labels)
 
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
+            # log(DEBUG, f"Backward pass")
             loss.backward()
+            # log(DEBUG, f"Optimising")
             optimizer.step()
 
             # Get statistics
@@ -78,7 +84,7 @@ def get_train_and_prune(
             epochs=epochs,
         )
         prune.global_unstructured(
-            parameters=parameters_to_prune,
+            parameters=[(module, tensor_name) for module, tensor_name, _ in parameters_to_prune],
             pruning_method=pruning_method,
             amount=amount,
         )
@@ -121,7 +127,7 @@ def get_iterative_train_and_prune(
                 epochs=1,
             )
             prune.global_unstructured(
-                parameters=parameters_to_prune,
+                parameters=[(module, tensor_name) for module, tensor_name, _ in parameters_to_prune],
                 pruning_method=pruning_method,
                 amount=per_epoch_amount,
             )
