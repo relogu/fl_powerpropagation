@@ -3,6 +3,7 @@ TODO:
 """
 
 from typing import Union
+from copy import deepcopy
 
 import torch
 import torch.nn as nn
@@ -107,17 +108,17 @@ class swat_conv2d_unstructured(Function):
         weight,
         bias,
         sparsity,
+        wt_threshold,
         in_threshold,
-        out_threshold,
         stride,
         padding,
         dilation,
         groups,
     ):
-        if in_threshold is None:
-            weight, in_threshold = drop_nhwc_send_th(weight, 1 - sparsity)
+        if wt_threshold is None:
+            weight, wt_threshold = drop_nhwc_send_th(weight, 1 - sparsity)
         else:
-            weight = drop_threshold(weight, in_threshold)
+            weight = drop_threshold(weight, wt_threshold)
         output = F.conv2d(
             input=input,
             weight=weight,
@@ -127,10 +128,10 @@ class swat_conv2d_unstructured(Function):
             dilation=dilation,
             groups=groups,
         )
-        if out_threshold is None:
-            input, out_threshold = drop_nhwc_send_th(input, 1 - sparsity)
+        if in_threshold is None:
+            input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity)
         else:
-            input = drop_threshold(input, out_threshold)
+            input = drop_threshold(input, in_threshold)
         ctx.save_for_backward(input, weight, bias)
         ctx.conf = {
             "stride": stride,
@@ -138,12 +139,12 @@ class swat_conv2d_unstructured(Function):
             "dilation": dilation,
             "groups": groups,
         }
-        return output, in_threshold, out_threshold
+        return output, wt_threshold, in_threshold
 
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
     @once_differentiable
-    def backward(ctx, grad_output, grad_in_th, grad_out_th):
+    def backward(ctx, grad_output, grad_wt_th, grad_in_th):
         return convolution_backward(ctx, grad_output)
 
 
@@ -155,7 +156,7 @@ class swat_conv2d_structured_channel(Function):
         weight,
         bias,
         sparsity,
-        out_threshold,
+        in_threshold,
         stride,
         padding,
         dilation,
@@ -171,10 +172,10 @@ class swat_conv2d_structured_channel(Function):
             dilation=dilation,
             groups=groups,
         )
-        if out_threshold is None:
-            input, out_threshold = drop_nhwc_send_th(input, 1 - sparsity)
+        if in_threshold is None:
+            input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity)
         else:
-            input = drop_threshold(input, out_threshold)
+            input = drop_threshold(input, in_threshold)
         ctx.save_for_backward(input, weight, bias)
         ctx.conf = {
             "stride": stride,
@@ -182,12 +183,12 @@ class swat_conv2d_structured_channel(Function):
             "dilation": dilation,
             "groups": groups,
         }
-        return output, out_threshold
+        return output, in_threshold
 
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
     @once_differentiable
-    def backward(ctx, grad_output, grad_out_th):
+    def backward(ctx, grad_output, grad_in_th):
         return convolution_backward(ctx, grad_output)
 
 
@@ -199,7 +200,7 @@ class swat_conv2d_structured_filter(Function):
         weight,
         bias,
         sparsity,
-        out_threshold,
+        in_threshold,
         stride,
         padding,
         dilation,
@@ -215,10 +216,10 @@ class swat_conv2d_structured_filter(Function):
             dilation=dilation,
             groups=groups,
         )
-        if out_threshold is None:
-            input, out_threshold = drop_nhwc_send_th(input, 1 - sparsity)
+        if in_threshold is None:
+            input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity)
         else:
-            input = drop_threshold(input, out_threshold)
+            input = drop_threshold(input, in_threshold)
         ctx.save_for_backward(input, weight, bias)
         ctx.conf = {
             "stride": stride,
@@ -226,12 +227,12 @@ class swat_conv2d_structured_filter(Function):
             "dilation": dilation,
             "groups": groups,
         }
-        return output, out_threshold
+        return output, in_threshold
 
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
     @once_differentiable
-    def backward(ctx, grad_output, grad_out_th):
+    def backward(ctx, grad_output, grad_in_th):
         return convolution_backward(ctx, grad_output)
 
 
@@ -311,8 +312,8 @@ class SWATConv2D(nn.Module):
         self.pruning_type = pruning_type
         self.warmup = warm_up
         self.period = period
-        self.wt_threshold = 0.0
-        self.in_threshold = 0.0
+        self.wt_threshold = None
+        self.in_threshold = None
         self.epoch = 0
         self.batch_idx = 0
 
@@ -325,24 +326,56 @@ class SWATConv2D(nn.Module):
 
     def _call_swat_conv2d(self, input, weight) -> torch.Tensor:
         # TODO: Add the decision pipeline proposed in the original paper
-        return swat_conv2d_unstructured.apply(
-            input,
-            weight,
-            self.bias,
-            self.sparsity,
-            self.in_threshold,
-            self.wt_threshold,
-            self.stride,
-            self.padding,
-            self.dilation,
-            self.groups,
-        )
+        if self.pruning_type == "unstructured":
+            output, wt_threshold, in_threshold = swat_conv2d_unstructured.apply(
+                input,
+                weight,
+                self.bias,
+                self.sparsity,
+                deepcopy(self.in_threshold),
+                deepcopy(self.wt_threshold),
+                self.stride,
+                self.padding,
+                self.dilation,
+                self.groups,
+            )
+        elif self.pruning_type == "structured_channel":
+            output, in_threshold = swat_conv2d_structured_channel.apply(
+                input,
+                weight,
+                self.bias,
+                self.sparsity,
+                deepcopy(self.in_threshold),
+                self.stride,
+                self.padding,
+                self.dilation,
+                self.groups,
+            )
+        elif self.pruning_type == "structured_filter":
+            output, in_threshold = swat_conv2d_structured_filter.apply(
+                input,
+                weight,
+                self.bias,
+                self.sparsity,
+                deepcopy(self.in_threshold),
+                self.stride,
+                self.padding,
+                self.dilation,
+                self.groups,
+            )
+        else:
+            assert (0, "Illegal Pruning Type")
+        if self.epoch >= self.warmup:
+            if self.batch_idx % self.period == 0:
+                self.wt_threshold = wt_threshold
+                self.in_threshold = in_threshold
+        return output
 
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         # Perform SWAT forward pass
-        output, self.in_threshold, self.wt_threshold = self._call_swat_conv2d(
+        output = self._call_swat_conv2d(
             input,
             weight,
         )
