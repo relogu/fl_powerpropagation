@@ -230,8 +230,6 @@ class swat_conv2d_structured_filter(Function):
         else:
             input = drop_threshold(input, out_threshold)
         ctx.save_for_backward(input, weight, bias)
-        return output, out_threshold
-        ctx.save_for_backward(input, weight, bias)
         ctx.conf = {
             "stride": stride,
             "padding": padding,
