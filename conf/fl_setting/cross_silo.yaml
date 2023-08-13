@@ -4,8 +4,8 @@ num_total_clients: 100
 lda_concentration: 0.10
 num_train_clients_per_round: 10
 num_eval_clients_per_round: 10
-local_epochs: 10
-lr: 0.001
+local_epochs: 1
+lr: 0.1
 batch_size: 32
 local_eval: True
 centralised_eval: True
