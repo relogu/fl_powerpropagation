@@ -47,6 +47,7 @@ def my_app(cfg: DictConfig) -> None:
 
     strategy = instantiate(
         cfg.strategy.init,
+        total_clients=cfg.fl_setting.num_total_clients,
         fraction_fit=(float(cfg.fl_setting.num_train_clients_per_round) / cfg.fl_setting.num_total_clients),
         fraction_evaluate=(
             float(cfg.fl_setting.num_eval_clients_per_round) / cfg.fl_setting.num_total_clients
@@ -134,4 +135,7 @@ if __name__ == "__main__":
     # srun -w ngongotaha -c 8 --gres=gpu:1 --partition=interactive python main.py num_rounds=1 is_simulation=True model=powerprop ray_config.gpus_per_client=0.25
     # srun -w mauao -c 11 --gres=gpu:1 --partition=interactive python main.py num_rounds=1 is_simulation=True model=powerprop client_training_fn=pruning
     # srun -w mauao -c 11 --gres=gpu:1 --partition=interactive python main.py num_rounds=1 is_simulation=True model=powerprop client_training_fn=iterative_pruning
+    # srun -w mauao -c 11 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=True client_training_fn=swat fl_setting.num_train_clients_per_round=10 model=powerprop model.init_model_fn.alpha=2.0
+    # srun -w mauao -c 11 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=True fl_setting.num_train_clients_per_round=10 model=swat
+    # srun -w ngongotaha -c 8 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=True fl_setting.num_train_clients_per_round=10 model=swat ray_config.gpus_per_client=0.3
     my_app()
