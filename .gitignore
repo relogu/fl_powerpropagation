@@ -10,3 +10,9 @@ wandb
 # Hydra output directories
 multirun
 outputs
+
+# VSCode stuff
+.vscode/**
+
+# Ninja build files
+build/**
