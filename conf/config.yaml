@@ -15,6 +15,6 @@ defaults:
   - fl_setting: "cross_silo"
   - ray_config: base
   - server: "checkpoint_wandb_server"
-  - strategy: "fedavg"
+  - strategy: "rs_fedavg"
   - wandb: base
   - model: base
