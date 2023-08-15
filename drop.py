@@ -78,7 +78,7 @@ def drop_nhwc_send_th(
     threshold: torch.Tensor = topk[0][-1]
     index = tensor.abs() >= (threshold)
     index = index.type_as(tensor)
-    tensor *= index
+    tensor = tensor * index
     return tensor, threshold
 
 
@@ -178,7 +178,7 @@ def matrix_drop_th(
     threshold: torch.Tensor = topk[0][-1]
     index = tensor.abs() >= (threshold)
     index = index.type_as(tensor)
-    tensor *= index
+    tensor = tensor * index
     return tensor, threshold
 
 
