@@ -195,11 +195,13 @@ def get_parameters_to_prune(
     ) -> None:
         if (
             type(module) == PowerPropConv2D
+            or type(module) == PowerPropLinear
             or type(module) == nn.Conv2d
             or type(module) == nn.Linear
-            or type(module) == PowerPropLinear
+            or type(module) == SWATConv2D
+            or type(module) == SWATLinear
         ):
-            parameters_to_prune.append((module, "w", name))
+            parameters_to_prune.append((module, "weight", name))
         for name, immediate_child_module in module.named_children():
             add_immediate_child(immediate_child_module, name)
 
