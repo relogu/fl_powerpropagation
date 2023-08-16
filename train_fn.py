@@ -102,11 +102,11 @@ def get_train_with_hooks() -> Callable[[Module, DataLoader, Optimizer, str, int]
             if grad_output_total > 0:
                 out_gradients_sparsity[f'out_gradients_sparsity_{name}'] = grad_output_non_zeros / grad_output_total
             
-        for module, name in [(module, layer_name) for module, _, layer_name in parameters_to_prune]:
-            module.register_forward_hook(partial(get_sparsity, name))
-            # module.register_forward_hook(partial(get_max_weight, name))
-            module.register_forward_hook(partial(get_non_zeros, name))
-            module.register_full_backward_hook(partial(get_gradients_sparsity, name))
+        # for module, name in [(module, layer_name) for module, _, layer_name in parameters_to_prune]:
+        #     module.register_forward_hook(partial(get_sparsity, name))
+        #     # module.register_forward_hook(partial(get_max_weight, name))
+        #     module.register_forward_hook(partial(get_non_zeros, name))
+        #     module.register_full_backward_hook(partial(get_gradients_sparsity, name))
         
         metrics = train(
             net=net,
@@ -115,11 +115,11 @@ def get_train_with_hooks() -> Callable[[Module, DataLoader, Optimizer, str, int]
             device=device,
             epochs=epochs,
         )
-        metrics.update(sparsity)
-        metrics.update(max_weight)
-        metrics.update(non_zeros)
-        metrics.update(in_gradients_sparsity)
-        metrics.update(out_gradients_sparsity)
+        # metrics.update(sparsity)
+        # metrics.update(max_weight)
+        # metrics.update(non_zeros)
+        # metrics.update(in_gradients_sparsity)
+        # metrics.update(out_gradients_sparsity)
         
         return metrics
 
