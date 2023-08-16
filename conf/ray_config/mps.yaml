@@ -1,5 +1,5 @@
 ---
-name: base
+name: mps
 include_dashboard: False
 cpus_per_client: 1
-gpus_per_client: 0.1
+gpus_per_client: 0.0
