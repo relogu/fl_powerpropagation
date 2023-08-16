@@ -24,24 +24,24 @@ from drop import (
 class swat_linear(Function):
     @staticmethod
     def forward(ctx, input, weight, bias, sparsity):
-        weight = matrix_drop(weight, 1 - sparsity)
+        sparse_weight = matrix_drop(weight, 1 - sparsity)
         if input.dim() == 2 and bias is not None:
             # The fused op is marginally faster
-            output = torch.addmm(bias, input, weight.t())
+            output = torch.addmm(bias, input, sparse_weight.t())
         else:
-            output = input.matmul(weight.t())
+            output = input.matmul(sparse_weight.t())
             if bias is not None:
                 output += bias
-        input = matrix_drop(input, 1 - sparsity)
-        ctx.save_for_backward(input, weight)
+        sparse_input = matrix_drop(input, 1 - sparsity)
+        ctx.save_for_backward(sparse_input, sparse_weight)
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        input, weight = ctx.saved_tensors
+        sparse_input, sparse_weight = ctx.saved_tensors
         grad_input = grad_weight = grad_bias = None
-        grad_input = torch.mm(grad_output, weight)
-        grad_weight = torch.mm(input.t(), grad_output)
+        grad_input = torch.mm(grad_output, sparse_weight)
+        grad_weight = torch.mm(sparse_input.t(), grad_output)
         grad_bias = torch.sum(grad_output, 0)
         return grad_input, grad_weight.t(), grad_bias, None
 
@@ -50,7 +50,7 @@ def convolution_backward(
     ctx,
     grad_output,
 ):
-    input, weight, bias = ctx.saved_tensors
+    sparse_input, sparse_weight, bias = ctx.saved_tensors
     conf = ctx.conf
     input_grad = (
         weight_grad
@@ -64,8 +64,8 @@ def convolution_backward(
     # Compute gradient w.r.t. input
     if ctx.needs_input_grad[0]:
         input_grad = torch.nn.grad.conv2d_input(
-            input.shape,
-            weight,
+            sparse_input.shape,
+            sparse_weight,
             grad_output,
             conf["stride"],
             conf["padding"],
@@ -75,8 +75,8 @@ def convolution_backward(
     # Compute gradient w.r.t. weight
     if ctx.needs_input_grad[1]:
         weight_grad = torch.nn.grad.conv2d_weight(
-            input,
-            weight.shape,
+            sparse_input,
+            sparse_weight.shape,
             grad_output,
             conf["stride"],
             conf["padding"],
@@ -116,12 +116,12 @@ class swat_conv2d_unstructured(Function):
         groups,
     ):
         if wt_threshold is None:
-            weight, wt_threshold = drop_nhwc_send_th(weight, 1 - sparsity)
+            sparse_weight, wt_threshold = drop_nhwc_send_th(weight, 1 - sparsity)
         else:
-            weight = drop_threshold(weight, wt_threshold)
+            sparse_weight = drop_threshold(weight, wt_threshold)
         output = F.conv2d(
             input=input,
-            weight=weight,
+            weight=sparse_weight,
             bias=bias,
             stride=stride,
             padding=padding,
@@ -129,10 +129,10 @@ class swat_conv2d_unstructured(Function):
             groups=groups,
         )
         if in_threshold is None:
-            input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity)
+            sparse_input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity)
         else:
-            input = drop_threshold(input, in_threshold)
-        ctx.save_for_backward(input, weight, bias)
+            sparse_input = drop_threshold(input, in_threshold)
+        ctx.save_for_backward(sparse_input, sparse_weight, bias)
         ctx.conf = {
             "stride": stride,
             "padding": padding,
