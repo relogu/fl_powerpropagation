@@ -140,6 +140,6 @@ if __name__ == "__main__":
     # srun -w mauao -c 11 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=True client_training_fn=swat fl_setting.num_train_clients_per_round=10 model=powerprop model.init_model_fn.alpha=2.0
     # srun -w mauao -c 11 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=True fl_setting.num_train_clients_per_round=10 model=swat
     # srun -w ngongotaha -c 8 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=True fl_setting.num_train_clients_per_round=10 model=swat ray_config.gpus_per_client=0.3
-    # python main.py is_local=True num_rounds=10 is_simulation=False fl_setting.num_train_clients_per_round=10 model=swat ray_config=mps
-    # python main.py is_local=True num_rounds=10 fl_setting.num_train_clients_per_round=10 model=swat model.init_model_fn.alpha=4 model.init_model_fn.sparsity=1.0 ray_config=mps
+    # srun -w ngongotaha -c 8 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 is_simulation=False fl_setting.num_train_clients_per_round=10 model=swat ray_config.gpus_per_client=0.3
+    # srun -w ngongotaha -c 8 --gres=gpu:1 --partition=interactive python main.py num_rounds=10 fl_setting.num_train_clients_per_round=10 model=swat model.init_model_fn.alpha=1 model.init_model_fn.sparsity=0.0 ray_config.gpus_per_client=0.3
     my_app()

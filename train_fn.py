@@ -30,6 +30,7 @@ def train(
         for data in trainloader:
             # log(DEBUG, f"Get data")
             images, labels = data[0].to(device), data[1].to(device)
+            log(DEBUG, f"Got data with shape {images.shape}")
 
             # log(DEBUG, f"Zeroing gradients")
             # zero the parameter gradients
