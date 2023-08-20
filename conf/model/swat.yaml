@@ -3,4 +3,4 @@ name: swat
 init_model_fn: 
   _target_: model.get_network_generator_resnet_swat
   alpha: 2.0
-  sparsity: 0.9
+  sparsity: 0.9999
