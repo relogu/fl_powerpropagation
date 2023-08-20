@@ -180,7 +180,7 @@ def replace_layer_with_swat(
             setattr(module, attr_str, new_conv)
 
     for name, immediate_child_module in module.named_children():
-        replace_layer_with_swat(immediate_child_module, name, alpha)
+        replace_layer_with_swat(immediate_child_module, name, alpha, sparsity)
 
 
 def get_parameters_to_prune(
