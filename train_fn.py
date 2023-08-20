@@ -30,7 +30,7 @@ def train(
         for data in trainloader:
             # log(DEBUG, f"Get data")
             images, labels = data[0].to(device), data[1].to(device)
-            log(DEBUG, f"Got data with shape {images.shape}")
+            # log(DEBUG, f"Got data with shape {images.shape}")
 
             # log(DEBUG, f"Zeroing gradients")
             # zero the parameter gradients
@@ -67,41 +67,41 @@ def get_train_with_hooks() -> Callable[[Module, DataLoader, Optimizer, str, int]
         epochs: int,
         **kwargs,
     ) -> Dict[str, Scalar]:
-        parameters_to_prune = get_parameters_to_prune(net)
-        sparsity: Dict[str, float] = {}
-        max_weight: Dict[str, float] = {}
-        non_zeros: Dict[str, int] = {}
-        in_gradients_sparsity: Dict[str, float] = {}
-        out_gradients_sparsity: Dict[str, float] = {}
-        flatten = lambda x: x.view(-1)
+        # parameters_to_prune = get_parameters_to_prune(net)
+        # sparsity: Dict[str, float] = {}
+        # max_weight: Dict[str, float] = {}
+        # non_zeros: Dict[str, int] = {}
+        # in_gradients_sparsity: Dict[str, float] = {}
+        # out_gradients_sparsity: Dict[str, float] = {}
+        # flatten = lambda x: x.view(-1)
         
-        def get_sparsity(name, module, input, output):
-            w: torch.Tensor = flatten(module.weight)
-            sparsity[f'sparsity_weight_{name}'] = (w.nonzero().size(0) / w.size(0))
-            i_non_zeros = sum([flatten(i).nonzero().size(0) for i in input])
-            i_total = sum([flatten(i).size(0) for i in input])
-            sparsity[f'sparsity_input_{name}'] = i_non_zeros / i_total
-            
-        # def get_max_weight(name, module, input, output):
+        # def get_sparsity(name, module, input, output):
         #     w: torch.Tensor = flatten(module.weight)
-        #     max_weight[f'max_weight_{name}'] = max(w.abs())
+        #     sparsity[f'sparsity_weight_{name}'] = (w.nonzero().size(0) / w.size(0))
+        #     i_non_zeros = sum([flatten(i).nonzero().size(0) for i in input])
+        #     i_total = sum([flatten(i).size(0) for i in input])
+        #     sparsity[f'sparsity_input_{name}'] = i_non_zeros / i_total
             
-        def get_non_zeros(name, module, input, output):
-            w: torch.Tensor = flatten(module.weight)
-            non_zeros[f'non_zero_weigth_{name}'] = w.nonzero().size(0)
-            non_zeros[f'non_zero_input_{name}'] = sum([i.nonzero().size(0) for i in input])
+        # # def get_max_weight(name, module, input, output):
+        # #     w: torch.Tensor = flatten(module.weight)
+        # #     max_weight[f'max_weight_{name}'] = max(w.abs())
             
-        def get_gradients_sparsity(name, module, grad_input, grad_output):
-            filtered_grad_input = filter(lambda x: x is not None, grad_input)
-            filtered_grad_output = filter(lambda x: x is not None, grad_output)
-            grad_input_non_zeros = sum([flatten(i).nonzero().size(0) for i in filtered_grad_input])
-            grad_input_total = sum([flatten(i).size(0) for i in filtered_grad_input])
-            grad_output_non_zeros = sum([flatten(i).nonzero().size(0) for i in filtered_grad_output])
-            grad_output_total = sum([flatten(i).size(0) for i in filtered_grad_output])
-            if grad_input_total > 0:
-                in_gradients_sparsity[f'in_gradients_sparsity_{name}'] = grad_input_non_zeros / grad_input_total
-            if grad_output_total > 0:
-                out_gradients_sparsity[f'out_gradients_sparsity_{name}'] = grad_output_non_zeros / grad_output_total
+        # def get_non_zeros(name, module, input, output):
+        #     w: torch.Tensor = flatten(module.weight)
+        #     non_zeros[f'non_zero_weigth_{name}'] = w.nonzero().size(0)
+        #     non_zeros[f'non_zero_input_{name}'] = sum([i.nonzero().size(0) for i in input])
+            
+        # def get_gradients_sparsity(name, module, grad_input, grad_output):
+        #     filtered_grad_input = filter(lambda x: x is not None, grad_input)
+        #     filtered_grad_output = filter(lambda x: x is not None, grad_output)
+        #     grad_input_non_zeros = sum([flatten(i).nonzero().size(0) for i in filtered_grad_input])
+        #     grad_input_total = sum([flatten(i).size(0) for i in filtered_grad_input])
+        #     grad_output_non_zeros = sum([flatten(i).nonzero().size(0) for i in filtered_grad_output])
+        #     grad_output_total = sum([flatten(i).size(0) for i in filtered_grad_output])
+        #     if grad_input_total > 0:
+        #         in_gradients_sparsity[f'in_gradients_sparsity_{name}'] = grad_input_non_zeros / grad_input_total
+        #     if grad_output_total > 0:
+        #         out_gradients_sparsity[f'out_gradients_sparsity_{name}'] = grad_output_non_zeros / grad_output_total
             
         # for module, name in [(module, layer_name) for module, _, layer_name in parameters_to_prune]:
         #     module.register_forward_hook(partial(get_sparsity, name))
