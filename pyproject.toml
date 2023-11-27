@@ -193,6 +193,7 @@ exclude = [
     "node_modules",
     "venv",
     "proto",
+    "project/task/utils"
 ]
 
 [tool.ruff.format]

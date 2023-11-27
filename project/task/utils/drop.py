@@ -157,18 +157,16 @@ def matrix_drop_th(
     tensor: torch.Tensor,
     select_percentage: float,
 ) -> torch.Tensor:
-    """Remove the elements of the input `tensor` using
-    `TopK` algorithm, where `k` is computed using the
-    `select_percentage` parameter and the dimensions of
-    the input `tensor`.
-    The input `tensor` is assumed to be a matrix, i.e.
-    a tensor of rank 2.
+    """Remove the elements of the input `tensor` using `TopK` algorithm, where `k` is
+    computed using the `select_percentage` parameter and the dimensions of the input
+    `tensor`. The input `tensor` is assumed to be a matrix, i.e. a tensor of rank 2.
 
     Args:
         tensor (torch.Tensor): input tensor to be pruned.
         select_percentage (float): defines the `k` for `TopK`.
 
-    Returns:
+    Returns
+    -------
         torch.Tensor: output pruned tensor.
         torch.Tensor: value of the threshold used.
     """
@@ -192,7 +190,8 @@ def matrix_drop(
         tensor (torch.Tensor): input tensor to be pruned.
         select_percentage (float): defines the `k` for `TopK`.
 
-    Returns:
+    Returns
+    -------
         torch.Tensor: output pruned tensor.
     """
     return matrix_drop_th(
@@ -205,18 +204,16 @@ def drop_threshold(
     tensor: torch.Tensor,
     threshold: float,
 ) -> torch.Tensor:
-    """Remove the elements of the input tensor
-    that are lower than the input threshold.
-    The element-wise pruning decision is performed
-    on the absolute value of the element, i.e. the
-    element `x` is pruned if `$|x|<t$` where `t`
-    is the threshold.
+    """Remove the elements of the input tensor that are lower than the input threshold.
+    The element-wise pruning decision is performed on the absolute value of the element,
+    i.e. the element `x` is pruned if `$|x|<t$` where `t` is the threshold.
 
     Args:
         tensor (torch.Tensor): input tensor to be pruned.
         threshold (float): threshold used for pruning.
 
-    Returns:
+    Returns
+    -------
         torch.Tensor: output pruned tensor
     """
     index = tensor.abs() >= threshold
@@ -229,16 +226,16 @@ def drop_random(
     tensor: torch.Tensor,
     select_percentage: float,
 ) -> torch.Tensor:
-    """Set to zero a random subsample of the input `tensor`.
-    The random selection is performed using a thresholded
-    uniform distribution between 0 and 1. The `select_percentage`
-    parameter defines the threshold.
+    """Set to zero a random subsample of the input `tensor`. The random selection is
+    performed using a thresholded uniform distribution between 0 and 1. The
+    `select_percentage` parameter defines the threshold.
 
     Args:
         tensor (torch.Tensor): input tensor to be pruned.
         select_percentage (float): defines the threshold.
 
-    Returns:
+    Returns
+    -------
         torch.Tensor: output pruned tensor.
     """
     tensor_shape = tensor.shape

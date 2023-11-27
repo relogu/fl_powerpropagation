@@ -1,4 +1,0 @@
----
-name: base
-training_fn:
-  _target_: train_fn.get_train_with_hooks

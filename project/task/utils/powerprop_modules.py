@@ -9,7 +9,7 @@ Adapted from the code available at: https://github.com/mysistinechapel/powerprop
 from typing import Union
 
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 from torch.types import _int, _size
 
@@ -33,7 +33,10 @@ class PowerPropLinear(nn.Module):
         self.bias = nn.Parameter(torch.empty(out_features)) if self.b else None
 
     def __repr__(self):
-        return f"PowerPropLinear(alpha={self.alpha}, in_features={self.in_features}, out_features={self.out_features}, bias={self.b})"
+        return (
+            f"PowerPropLinear(alpha={self.alpha}, in_features={self.in_features},"
+            f" out_features={self.out_features}, bias={self.b})"
+        )
 
     def get_weight(self):
         weight = self.weight.detach()
@@ -80,7 +83,12 @@ class PowerPropConv2D(nn.Module):
         self.groups = groups
 
     def __repr__(self):
-        return f"PowerPropConv2D(alpha={self.alpha}, in_channels={self.in_channels}, out_channels={self.out_channels}, kernel_size={self.kernel_size}, bias={self.b}, stride={self.stride}, padding={self.padding}, dilation={self.dilation}, groups={self.groups})"
+        return (
+            f"PowerPropConv2D(alpha={self.alpha}, in_channels={self.in_channels},"
+            f" out_channels={self.out_channels}, kernel_size={self.kernel_size},"
+            f" bias={self.b}, stride={self.stride}, padding={self.padding},"
+            f" dilation={self.dilation}, groups={self.groups})"
+        )
 
     def get_weights(self):
         weights = self.weight.detach()

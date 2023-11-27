@@ -1,19 +1,31 @@
+"""Define our models, and training and eval functions."""
+
 from copy import deepcopy
-from typing import Iterable, Tuple
+from collections.abc import Iterable
+from collections.abc import Callable
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from powerprop_modules import PowerPropConv2D, PowerPropLinear
-from swat_modules import SWATConv2D, SWATLinear
+
 from torch import nn
+from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
+from project.task.utils.swat_modules import SWATConv2D, SWATLinear
+from project.types.common import NetGen
+from project.utils.utils import lazy_config_wrapper
 from torchvision.models import resnet18
 
 
 class Net(nn.Module):
-    """Simple CNN adapted from 'PyTorch: A 60 Minute Blitz'."""
+    """Simple CNN adapted from 'PyTorch: A 60 Minute Blitz."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the network.
+
+        Returns
+        -------
+        None
+        """
         super().__init__()
         self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
@@ -22,7 +34,19 @@ class Net(nn.Module):
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the CNN.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input Tensor that will pass through the network
+
+        Returns
+        -------
+        torch.Tensor
+            The resulting Tensor after it has passed through the network
+        """
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
         x = torch.flatten(x, 1)  # flatten all dimensions except batch
@@ -32,12 +56,14 @@ class Net(nn.Module):
         return x
 
 
-class Net_Cifar_Resnet18(nn.Module):
+class NetCifarResnet18(nn.Module):
+    """A ResNet18 adapted to CIFAR10."""
+
     def __init__(
         self, num_classes: int, device: str = "cuda", groupnorm: bool = False
     ) -> None:
-        """A ResNet18 adapted to CIFAR10."""
-        super(Net_Cifar_Resnet18, self).__init__()
+        """Initialize network."""
+        super().__init__()
         self.num_classes = num_classes
         self.device = device
         # As the LEAF people do
@@ -53,23 +79,23 @@ class Net_Cifar_Resnet18(nn.Module):
         # no need for pooling if training for CIFAR-10
         self.net.maxpool = nn.Identity()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass."""
         return self.net(x)
 
 
-def init_weights(module: nn.Module):
+def init_weights(module: nn.Module) -> None:
     """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
     if isinstance(
         module,
-        (
-            PowerPropLinear,
-            PowerPropConv2D,
-            SWATLinear,
-            SWATConv2D,
-            nn.Linear,
-            nn.Conv2d,
-        ),
+        PowerPropLinear
+        | PowerPropConv2D
+        | SWATLinear
+        | SWATConv2D
+        | nn.Linear
+        | nn.Conv2d,
     ):
+        # Your code here
         fan_in = calculate_fan_in(module.weight.data)
 
         # constant from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
@@ -81,12 +107,7 @@ def init_weights(module: nn.Module):
         u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
         if isinstance(
             module,
-            (
-                PowerPropLinear,
-                PowerPropConv2D,
-                SWATLinear,
-                SWATConv2D,
-            ),
+            PowerPropLinear | PowerPropConv2D | SWATLinear | SWATConv2D,
         ):
             u = torch.sign(u) * torch.pow(torch.abs(u), 1.0 / module.alpha)
 
@@ -96,16 +117,20 @@ def init_weights(module: nn.Module):
 
 
 def calculate_fan_in(tensor: torch.Tensor) -> float:
-    """Modified from: https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py"""
+    """Calculate fan in.
+
+    Modified from: https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py
+    """
+    min_fan_in = 2
     dimensions = tensor.dim()
-    if dimensions < 2:
+    if dimensions < min_fan_in:
         raise ValueError(
             "Fan in can not be computed for tensor with fewer than 2 dimensions"
         )
 
     num_input_fmaps = tensor.size(1)
     receptive_field_size = 1
-    if dimensions > 2:
+    if dimensions > min_fan_in:
         for s in tensor.shape[2:]:
             receptive_field_size *= s
     fan_in = num_input_fmaps * receptive_field_size
@@ -115,9 +140,9 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
 
 def replace_layer_with_powerprop(
     module: nn.Module,
-    name: str = "Model",
+    name: str = "Model",  # ? Never used. Give some problem
     alpha: float = 2.0,
-):
+) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
     for attr_str in dir(module):
         target_attr = getattr(module, attr_str)
@@ -141,8 +166,9 @@ def replace_layer_with_powerprop(
             )
             setattr(module, attr_str, new_conv)
 
-    for name, immediate_child_module in module.named_children():
-        replace_layer_with_powerprop(immediate_child_module, name, alpha)
+    # ? for name, immediate_child_module in module.named_children(): # Previus version
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_powerprop(immediate_child_module, model, alpha)
 
 
 def replace_layer_with_swat(
@@ -150,7 +176,7 @@ def replace_layer_with_swat(
     name: str = "Model",
     alpha: float = 2.0,
     sparsity: float = 0.3,
-):
+) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
     for attr_str in dir(module):
         target_attr = getattr(module, attr_str)
@@ -179,14 +205,18 @@ def replace_layer_with_swat(
             )
             setattr(module, attr_str, new_conv)
 
-    for name, immediate_child_module in module.named_children():
-        replace_layer_with_swat(immediate_child_module, name, alpha, sparsity)
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_swat(immediate_child_module, model, alpha, sparsity)
 
 
 def get_parameters_to_prune(
     net: nn.Module,
-) -> Iterable[Tuple[nn.Module, str]]:
-    """Return an iterable of tuples containing the PowerPropConv2D layers in the input model."""
+) -> Iterable[tuple[nn.Module, str, str]]:
+    """Pruning.
+
+    Return an iterable of tuples containing the PowerPropConv2D layers in the input
+    model.
+    """
     parameters_to_prune = []
 
     def add_immediate_child(
@@ -194,16 +224,17 @@ def get_parameters_to_prune(
         name: str,
     ) -> None:
         if (
-            type(module) == PowerPropConv2D
-            or type(module) == PowerPropLinear
-            or type(module) == nn.Conv2d
-            or type(module) == nn.Linear
-            or type(module) == SWATConv2D
-            or type(module) == SWATLinear
+            type(module)
+            == PowerPropConv2D | type(module)
+            == PowerPropLinear | type(module)
+            == nn.Conv2d | type(module)
+            == nn.Linear | type(module)
+            == SWATConv2D | type(module)
+            == SWATLinear
         ):
             parameters_to_prune.append((module, "weight", name))
-        for name, immediate_child_module in module.named_children():
-            add_immediate_child(immediate_child_module, name)
+        for model, immediate_child_module in module.named_children():
+            add_immediate_child(immediate_child_module, model)
 
     add_immediate_child(net, "Net")
 
@@ -212,29 +243,37 @@ def get_parameters_to_prune(
 
 # All experiments will have the exact same initialization.
 # All differences in performance will come from training
-def get_network_generator_cnn():
+def get_network_generator_cnn() -> Callable[[], Net]:
+    """Net network generatror."""
     untrained_net: Net = Net()
 
-    def generated_net():
+    def generated_net() -> Net:
         return deepcopy(untrained_net)
 
     return generated_net
 
 
-def get_network_generator_resnet() -> Net_Cifar_Resnet18:
-    untrained_net: Net_Cifar_Resnet18 = Net_Cifar_Resnet18(num_classes=10)
+def get_network_generator_resnet() -> Callable[[], NetCifarResnet18]:
+    """Cifar Resnet18 network generatror."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
 
-    def generated_net() -> Net_Cifar_Resnet18:
+    def generated_net() -> NetCifarResnet18:
         return deepcopy(untrained_net)
 
     return generated_net
 
 
-def get_network_generator_resnet_powerprop(alpha: float = 2.0) -> Net_Cifar_Resnet18:
-    untrained_net: Net_Cifar_Resnet18 = Net_Cifar_Resnet18(num_classes=10)
+# ? This must be changed. Since only return a simple resnet18 without modified layer
+get_net: NetGen = lazy_config_wrapper(NetCifarResnet18)
+
+
+def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet18]:
+    """Powerprop Resnet generator."""
+    alpha: float = 2.0
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
     replace_layer_with_powerprop(
         module=untrained_net,
-        name="Net_Cifar_Resnet18",
+        name="NetCifarResnet18",
         alpha=alpha,
     )
 
@@ -247,7 +286,7 @@ def get_network_generator_resnet_powerprop(alpha: float = 2.0) -> Net_Cifar_Resn
 
     init_model(untrained_net)
 
-    def generated_net() -> Net_Cifar_Resnet18:
+    def generated_net(_config: dict) -> NetCifarResnet18:
         return deepcopy(untrained_net)
 
     return generated_net
@@ -255,11 +294,12 @@ def get_network_generator_resnet_powerprop(alpha: float = 2.0) -> Net_Cifar_Resn
 
 def get_network_generator_resnet_swat(
     alpha: float = 2.0, sparsity: float = 0.3
-) -> Net_Cifar_Resnet18:
-    untrained_net: Net_Cifar_Resnet18 = Net_Cifar_Resnet18(num_classes=10)
+) -> Callable[[], NetCifarResnet18]:
+    """Swat network generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
     replace_layer_with_swat(
         module=untrained_net,
-        name="Net_Cifar_Resnet18",
+        name="NetCifarResnet18",
         alpha=alpha,
         sparsity=sparsity,
     )
@@ -267,13 +307,15 @@ def get_network_generator_resnet_swat(
     def init_model(
         module: nn.Module,
     ) -> None:
+        """Model initializer."""
         init_weights(module)
         for _, immediate_child_module in module.named_children():
             init_model(immediate_child_module)
 
     init_model(untrained_net)
 
-    def generated_net() -> Net_Cifar_Resnet18:
+    def generated_net() -> NetCifarResnet18:
+        """Net generator."""
         return deepcopy(untrained_net)
 
     return generated_net
