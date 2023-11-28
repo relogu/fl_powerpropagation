@@ -24,7 +24,7 @@ from project.utils.utils import obtain_device
 
 
 class ClientConfig(BaseModel):
-    """Fit/eval config, allows '.' member acces and static checking.
+    """Fit/eval config, allows '.' member access and static checking.
 
     Used to check weather each component has its own independent config present. Each
     component should then use its own Pydantic model to validate its config. For

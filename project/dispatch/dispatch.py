@@ -22,13 +22,13 @@ from project.task.mnist_classification.dispatch import (
     dispatch_train as dispatch_mnist_train,
 )
 
-from project.task.cifar10.dispatch import (
+from project.task.cifar.dispatch import (
     dispatch_config as dispatch_cifar_config,
 )
-from project.task.cifar10.dispatch import (
+from project.task.cifar.dispatch import (
     dispatch_data as dispatch_cifar_data,
 )
-from project.task.cifar10.dispatch import (
+from project.task.cifar.dispatch import (
     dispatch_train as dispatch_cifar_train,
 )
 

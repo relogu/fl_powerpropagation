@@ -84,6 +84,9 @@ class NetCifarResnet18(nn.Module):
         return self.net(x)
 
 
+get_resnet: NetGen = lazy_config_wrapper(NetCifarResnet18)
+
+
 def init_weights(module: nn.Module) -> None:
     """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
     if isinstance(

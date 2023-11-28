@@ -13,6 +13,9 @@ from torch import nn
 import torch.nn.functional as F
 from torch.types import _int, _size
 
+import logging
+from flwr.common import log
+
 
 class PowerPropLinear(nn.Module):
     """Powerpropagation Linear module."""
@@ -49,7 +52,7 @@ class PowerPropLinear(nn.Module):
         if mask is not None:
             weight *= mask
         # Compute the linear forward pass usign the re-parametrised weight
-        return F.linear(inputs=inputs, weight=weight, bias=self.bias)
+        return F.linear(input=inputs, weight=weight, bias=self.bias)
 
 
 class PowerPropConv2D(nn.Module):

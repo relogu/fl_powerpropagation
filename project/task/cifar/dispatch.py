@@ -22,10 +22,10 @@ from pathlib import Path
 from omegaconf import DictConfig
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
-from project.task.cifar10.dataset import get_dataloader_generators
-from project.task.cifar10.models import get_network_generator_resnet_powerprop
-from project.task.cifar10.train_test import get_fed_eval_fn, test
-from project.task.cifar10.train_test import (
+from project.task.cifar.dataset import get_dataloader_generators
+from project.task.cifar.models import get_network_generator_resnet_powerprop
+from project.task.cifar.train_test import get_fed_eval_fn, test, train
+from project.task.cifar.train_test import (
     get_train_and_prune,
 )
 from project.types.common import DataStructure, TrainStructure
@@ -62,7 +62,13 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "CIFAR_base":
+    if train_structure is not None and train_structure.upper() == "CIFAR_BASE":
+        return (
+            train,
+            test,
+            get_fed_eval_fn,
+        )
+    elif train_structure is not None and train_structure.upper() == "CIFAR_POWERPROP":
         return (
             get_train_and_prune(amount=0.3, pruning_method="base"),
             test,

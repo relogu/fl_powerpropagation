@@ -2,16 +2,16 @@
 # Federated setup
 num_rounds: 5
 num_total_clients: 10
-num_clients_per_round: 2
-num_evaluate_clients_per_round: 2
+num_clients_per_round: 4
+num_evaluate_clients_per_round: 4
 
 # If clients should be sampled with replacement
 # when the dataset is not large enough
 enable_resampling: false
 
 # Client resources
-cpus_per_client: 10
-gpus_per_client: 0
+cpus_per_client: 4
+gpus_per_client: 0.25
 
 # Seed for client selection
 seed: 1337

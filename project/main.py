@@ -32,7 +32,6 @@ from project.fed.utils.utils import (
     get_initial_parameters,
     get_save_parameters_to_file,
     get_weighted_avg_metrics_agg_fn,
-    test_client,
 )
 from project.types.common import ClientGen, FedEvalFN
 from project.utils.utils import (
@@ -41,6 +40,7 @@ from project.utils.utils import (
     seed_everything,
     wandb_init,
 )
+
 
 # Make debugging easier when using Hydra + Ray
 os.environ["HYDRA_FULL_ERROR"] = "1"
@@ -282,7 +282,7 @@ def main(cfg: DictConfig) -> None:
 
             # Runs fit and eval on either one client or all of them
             # Avoids launching ray for debugging purposes
-            test_client(
+            """test_client(
                 test_all_clients=cfg.test_clients.all,
                 test_one_client=cfg.test_clients.one,
                 client_generator=client_generator,
@@ -290,7 +290,7 @@ def main(cfg: DictConfig) -> None:
                 total_clients=cfg.fed.num_total_clients,
                 on_fit_config_fn=on_fit_config_fn,
                 on_evaluate_config_fn=on_evaluate_config_fn,
-            )
+            )"""
 
             # Start Simulation
             # The ray_init_args are only necessary
@@ -304,7 +304,7 @@ def main(cfg: DictConfig) -> None:
                     "num_cpus": int(
                         cfg.fed.cpus_per_client,
                     ),
-                    "num_gpus": int(
+                    "num_gpus": float(
                         cfg.fed.gpus_per_client,
                     ),
                 },
@@ -314,13 +314,14 @@ def main(cfg: DictConfig) -> None:
                 ),
                 ray_init_args=(
                     {
+                        "num_gpus": 1.0,
                         "include_dashboard": False,
                         "address": cfg.ray_address,
                         "_redis_password": cfg.ray_redis_password,
                         "_node_ip_address": cfg.ray_node_ip_address,
                     }
                     if cfg.ray_address is not None
-                    else {"include_dashboard": False}
+                    else {"num_gpus": 1.0, "include_dashboard": False}
                 ),
             )
 

@@ -1,11 +1,11 @@
 ---
 # Where to store data
-dataset_dir: ./data/cifar10/data
+dataset_dir: ./data/cifar/data
 
 # Folder of client folders
 # indexed by id, containing train and test
 # data in .pt format
-partition_dir: ./data/cifar10/partition
+partition_dir: ./data/cifar/partition
 
 # How many clients to create
 num_clients: 10
@@ -18,8 +18,8 @@ val_ratio: 0.1
 seed: 1337
 
 # If the partition labels 
-# should be independent and identically distributed
-iid: false
+# should be independent and identically distributed 
+iid: true  # to fix, bring back at false
 
 # If the partition labels should follow a power law
 # distribution

@@ -8,20 +8,34 @@ Problems:
 from logging import ERROR
 from collections.abc import Callable
 
+
+import logging
+from flwr.common import log
+
 from collections.abc import Sized
 from pathlib import Path
 from typing import cast
 
 import torch
 from pydantic import BaseModel
-from flwr.common.logger import log
-from project.task.cifar10.models import get_parameters_to_prune
+from project.task.cifar.models import get_parameters_to_prune
 from torch import nn
 from torch.nn import Module
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
 
-from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
+
+from flwr.common import NDArrays
+
+from project.client.client import ClientConfig
+from project.fed.utils.utils import generic_set_parameters
+from project.types.common import (
+    FedDataloaderGen,
+    FedEvalFN,
+    NetGen,
+    TestFunc,
+)
+from project.utils.utils import obtain_device
 
 
 class TrainConfig(BaseModel):
@@ -211,39 +225,6 @@ def get_train_with_hooks() -> (
     return train_with_hooks
 
 
-def train_and_prune(
-    net: Module,
-    trainloader: DataLoader,
-    _config: dict,
-    _working_dir: Path,
-) -> tuple[int, dict]:
-    """Training and pruning process."""
-    # The above values must be added to the config file
-    amount: float = 0.3
-    pruning_method: str = "base"
-
-    parameters_to_prune = get_parameters_to_prune(net)
-
-    metrics = train(
-        net=net,
-        trainloader=trainloader,
-        _config=_config,
-        _working_dir=_working_dir,
-    )
-    """Parameters = [ (module, tensor_name) for module, tensor_name, _ in
-    parameters_to_prune ] #?"""
-
-    prune.global_unstructured(
-        parameters_to_prune,
-        pruning_method=pruning_method,
-        amount=amount,
-    )
-
-    for module, name, _ in parameters_to_prune:
-        prune.remove(module, name)
-    return metrics
-
-
 def get_train_and_prune(
     amount: float = 0.3, pruning_method: str = "base"
 ) -> Callable[[Module, DataLoader, dict, Path], tuple[int, dict]]:
@@ -267,6 +248,7 @@ def get_train_and_prune(
         """Training and pruning process."""
         parameters_to_prune = get_parameters_to_prune(net)
 
+        log(logging.DEBUG, "Start training")
         metrics = train(
             net=net,
             trainloader=trainloader,
@@ -284,6 +266,7 @@ def get_train_and_prune(
 
         for module, name, _ in parameters_to_prune:
             prune.remove(module, name)
+
         return metrics
 
     return train_and_prune
@@ -417,4 +400,70 @@ def test(
     )
 
 
-get_fed_eval_fn = get_default_fed_eval_fn
+def get_fed_eval_fn(
+    net_generator: NetGen,
+    fed_dataloater_generator: FedDataloaderGen,
+    test_func: TestFunc,
+    _config: dict,
+    working_dir: Path,
+) -> FedEvalFN | None:
+    """Get the federated evaluation function.
+
+    Parameters
+    ----------
+    net_generator : NetGenerator
+        The function to generate the network.
+    testloader : DataLoader
+        The DataLoader containing the data to test the network on.
+
+    Returns
+    -------
+    Optional[FedEvalFN]
+        The evaluation function for the server
+        if the testloader is not empty, else None.
+    """
+    config: ClientConfig = ClientConfig(**_config)
+    del _config
+
+    testloader = fed_dataloater_generator(
+        True,
+        config.dataloader_config,
+    )
+
+    def fed_eval_fn(
+        _server_round: int,
+        parameters: NDArrays,
+        fake_config: dict,
+    ) -> tuple[float, dict] | None:
+        """Evaluate the model on the given data.
+
+        Parameters
+        ----------
+        server_round : int
+            The current server round.
+        parameters : NDArrays
+            The parameters of the model to evaluate.
+        _config : Dict
+            The configuration for the evaluation.
+
+        Returns
+        -------
+        Optional[Tuple[float, Dict]]
+            The loss and the accuracy of the input model on the given data.
+        """
+        net = net_generator(config.net_config)
+        generic_set_parameters(net, parameters)
+        config.run_config["device"] = obtain_device()
+
+        if len(cast(Sized, testloader.dataset)) == 0:
+            return None
+
+        loss, _num_samples, metrics = test_func(
+            net,
+            testloader,
+            config.run_config,
+            working_dir,
+        )
+        return loss, metrics
+
+    return fed_eval_fn
