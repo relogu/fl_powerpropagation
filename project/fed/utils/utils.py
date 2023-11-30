@@ -5,6 +5,7 @@ import struct
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from pathlib import Path
+from project.task.cifar.models import get_network_generator_resnet_powerprop
 
 import torch
 from flwr.common import (
@@ -42,15 +43,16 @@ def generic_set_parameters(
     params_dict = zip(
         net.state_dict().keys(),
         parameters,
-        strict=True,
+        strict=False,
     )
     state_dict = OrderedDict(
         # {k: torch.Tensor(v if not to_copy else v.copy()) for k, v in params_dict},
-        # {k: torch.Tensor(v) for k, v in params_dict},
-        {k: torch.from_numpy(v) for k, v in params_dict},  # ?
+        # The commented version raise an error: !?
+        # IndexError: index 0 is out of bounds for dimension 0 with size 0
+        {k: torch.tensor(v if not to_copy else v.copy()) for k, v in params_dict},
     )
 
-    net.load_state_dict(state_dict, strict=True)
+    net.load_state_dict(state_dict)
 
 
 def generic_get_parameters(net: nn.Module) -> NDArrays:
@@ -66,7 +68,26 @@ def generic_get_parameters(net: nn.Module) -> NDArrays:
         NDArrays
         The parameters of the network.
     """
-    return [val.cpu().numpy() for _, val in net.state_dict().items()]
+    """get_net: NetGen = get_network_generator_resnet_powerprop()
+    config = None
+    _net = get_net(_config=config)
+    # Get the parameter from the old net (wrong order)
+    parameters = [val.cpu().numpy() for _, val in net.state_dict().items()]
+    # Create the dict with the unordered parameter
+    params_dict = zip(
+        net.state_dict().keys(),
+        parameters,
+        # strict=False,
+    )
+    state_dict = OrderedDict({k: torch.tensor(v.copy()) for k, v in params_dict})
+    # Insert the unordered parameter in the new net
+    _net.load_state_dict(state_dict)
+    # Extract the parameter from the ordered net
+    parameters = [val.cpu().numpy() for _, val in _net.state_dict().items()]"""
+
+    parameters = [val.cpu().numpy() for _, val in net.state_dict().items()]
+
+    return parameters
 
 
 def load_parameters_from_file(path: Path) -> Parameters:
@@ -321,3 +342,57 @@ def test_client(
                     res_fit,
                     res_eval,
                 )
+
+
+def log_print_layer(net: nn.Module, msg: str) -> None:
+    """Print some layar of the given net, along side of the message."""
+    # log(logging.DEBUG, msg)
+    parameters = [val.cpu().numpy() for _, val in net.state_dict().items()]
+    params_dict = zip(
+        net.state_dict().keys(),
+        parameters,
+        strict=True,
+    )
+    state_dict = OrderedDict(
+        {k: torch.tensor(v) for k, v in params_dict},
+    )
+
+    # log(logging.DEBUG, 'net.fc.weight:%s', state_dict['net.fc.weight'])
+    log(logging.DEBUG, "%s; net.fc.bias:%s", msg, state_dict["net.fc.bias"])
+
+
+def get_and_set_test(net: nn.Module, _config: dict) -> None:
+    """Check of the correct functionality of get and set parameters."""
+    get_net: NetGen = get_network_generator_resnet_powerprop()
+    _net = get_net(_config)
+
+    parameters = generic_get_parameters(net)
+    """params_dict = zip( _net.state_dict().keys(), parameters,
+
+    strict=False, )
+
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    """
+
+    log(
+        logging.DEBUG,
+        "[get_and_set_test] (from GET) net.fc.bias: %s",
+        len(_net.state_dict().keys()),
+    )
+
+    generic_set_parameters(net=_net, parameters=parameters)
+
+
+def load_net(net1: nn.Module, net2: nn.Module) -> None:
+    """Load net1 parameters into net2."""
+    # Extracting the parameter from _net
+    parameters = [val.cpu().numpy() for _, val in net1.state_dict().items()]
+    # Create the dict with the unordered parameter
+    params_dict = zip(
+        net1.state_dict().keys(),
+        parameters,
+        strict=False,
+    )
+    state_dict = OrderedDict({k: torch.tensor(v.copy()) for k, v in params_dict})
+    # Insert the unordered parameter in the old (ordered) net
+    net2.load_state_dict(state_dict)

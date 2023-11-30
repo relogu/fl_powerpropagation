@@ -23,7 +23,10 @@ from omegaconf import DictConfig
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar.dataset import get_dataloader_generators
-from project.task.cifar.models import get_network_generator_resnet_powerprop
+from project.task.cifar.models import (
+    get_network_generator_resnet_powerprop,
+    get_network_generator_resnet_swat,
+)
 from project.task.cifar.train_test import get_fed_eval_fn, test, train
 from project.task.cifar.train_test import (
     get_train_and_prune,
@@ -68,7 +71,10 @@ def dispatch_train(
             test,
             get_fed_eval_fn,
         )
-    elif train_structure is not None and train_structure.upper() == "CIFAR_POWERPROP":
+    elif (
+        train_structure is not None
+        and train_structure.upper() == "CIFAR_TRAIN_AND_PRUNE"
+    ):
         return (
             get_train_and_prune(amount=0.3, pruning_method="base"),
             test,
@@ -129,9 +135,15 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         )
 
         # Case insensitive matches
-        if client_model_and_data.upper() == "CIFAR_CNN":
+        if client_model_and_data.upper() == "CIFAR_POWERPROP":
             return (
                 get_network_generator_resnet_powerprop(),
+                client_dataloader_gen,
+                fed_dataloater_gen,
+            )
+        elif client_model_and_data.upper() == "CIFAR_SWAT":
+            return (
+                get_network_generator_resnet_swat(),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

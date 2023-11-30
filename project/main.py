@@ -32,6 +32,7 @@ from project.fed.utils.utils import (
     get_initial_parameters,
     get_save_parameters_to_file,
     get_weighted_avg_metrics_agg_fn,
+    test_client,
 )
 from project.types.common import ClientGen, FedEvalFN
 from project.utils.utils import (
@@ -282,7 +283,7 @@ def main(cfg: DictConfig) -> None:
 
             # Runs fit and eval on either one client or all of them
             # Avoids launching ray for debugging purposes
-            """test_client(
+            test_client(
                 test_all_clients=cfg.test_clients.all,
                 test_one_client=cfg.test_clients.one,
                 client_generator=client_generator,
@@ -290,7 +291,7 @@ def main(cfg: DictConfig) -> None:
                 total_clients=cfg.fed.num_total_clients,
                 on_fit_config_fn=on_fit_config_fn,
                 on_evaluate_config_fn=on_evaluate_config_fn,
-            )"""
+            )
 
             # Start Simulation
             # The ray_init_args are only necessary

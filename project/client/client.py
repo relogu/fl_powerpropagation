@@ -10,7 +10,10 @@ from flwr.common import NDArrays
 from pydantic import BaseModel
 from torch import nn
 
-from project.fed.utils.utils import generic_get_parameters, generic_set_parameters
+from project.fed.utils.utils import (
+    generic_get_parameters,
+    generic_set_parameters,
+)
 from project.types.common import (
     ClientDataloaderGen,
     ClientGen,
@@ -115,10 +118,12 @@ class Client(fl.client.NumPyClient):
         del _config
 
         config.run_config["device"] = obtain_device()
+
         self.net = self.set_parameters(
             parameters,
             config.net_config,
         )
+
         trainloader = self.dataloader_gen(
             self.cid,
             False,
@@ -130,6 +135,7 @@ class Client(fl.client.NumPyClient):
             config.run_config,
             self.working_dir,
         )
+
         return (
             generic_get_parameters(self.net),
             num_samples,

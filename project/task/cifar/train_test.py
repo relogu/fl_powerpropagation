@@ -9,18 +9,20 @@ from logging import ERROR
 from collections.abc import Callable
 
 
-import logging
 from flwr.common import log
 
 from collections.abc import Sized
 from pathlib import Path
 from typing import cast
 
+
 import torch
 from pydantic import BaseModel
-from project.task.cifar.models import get_parameters_to_prune
+from project.task.cifar.models import (
+    get_network_generator_resnet_powerprop,
+    get_parameters_to_prune,
+)
 from torch import nn
-from torch.nn import Module
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
 
@@ -28,7 +30,7 @@ from torch.utils.data import DataLoader
 from flwr.common import NDArrays
 
 from project.client.client import ClientConfig
-from project.fed.utils.utils import generic_set_parameters
+from project.fed.utils.utils import generic_set_parameters, load_net
 from project.types.common import (
     FedDataloaderGen,
     FedEvalFN,
@@ -193,12 +195,12 @@ def train_one_epoch(
 
 
 def get_train_with_hooks() -> (
-    Callable[[Module, DataLoader, dict, Path], tuple[int, dict]]
+    Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]
 ):
     """Training with hooks."""
 
     def train_with_hooks(
-        net: Module,
+        net: nn.Module,
         trainloader: DataLoader,
         _config: dict,
         _working_dir: Path,
@@ -227,12 +229,12 @@ def get_train_with_hooks() -> (
 
 def get_train_and_prune(
     amount: float = 0.3, pruning_method: str = "base"
-) -> Callable[[Module, DataLoader, dict, Path], tuple[int, dict]]:
+) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
     """Return the training loop with one step pruning at the end.
 
     Think about moving 'amount' to the config file
     """
-    if pruning_method == "base":
+    if pruning_method == "base":  # ? not working
         pruning_method = prune.BasePruningMethod
     elif pruning_method == "l1":
         pruning_method = prune.L1Unstructured
@@ -240,32 +242,51 @@ def get_train_and_prune(
         log(ERROR, f"Pruning method {pruning_method} not recognised, using base")
 
     def train_and_prune(
-        net: Module,
+        net: nn.Module,
         trainloader: DataLoader,
         _config: dict,
         _working_dir: Path,
     ) -> tuple[int, dict]:
         """Training and pruning process."""
-        parameters_to_prune = get_parameters_to_prune(net)
+        # if config.cifar.model_and_data == "CIFAR_POWERPROP":
+        get_net: NetGen = get_network_generator_resnet_powerprop()
+        # elif config.task.cifar.model_and_data == "CIFAR_SWAT":
+        # get_net: NetGen = get_network_generator_resnet_swat()
 
-        log(logging.DEBUG, "Start training")
+        # Creating new net for training and pruning,
+        # since the latter mess up the order of the layer
+
+        _net = get_net(_config)
+
+        # Initialize the new net with the older one (trained)
+        load_net(net1=net, net2=_net)
+
+        # Training & pruning on new net
+        parameters_to_prune = get_parameters_to_prune(_net)
+
         metrics = train(
-            net=net,
+            net=_net,
             trainloader=trainloader,
             _config=_config,
             _working_dir=_working_dir,
         )
-        """Parameters = [ (module, tensor_name) for module, tensor_name, _ in
-        parameters_to_prune ] #?"""
 
         prune.global_unstructured(
-            parameters_to_prune,
+            parameters=[
+                (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+            ],
             pruning_method=pruning_method,
-            amount=amount,
+            # amount=amount,
         )
 
         for module, name, _ in parameters_to_prune:
             prune.remove(module, name)
+
+        load_net(net1=_net, net2=net)
+
+        # log_print_layer(net, "[train_and_prune] net")
+        # log(logging.DEBUG,'[train_and_prune] net keys:%s\n\n',
+        # net.state_dict().keys())
 
         return metrics
 
@@ -275,7 +296,7 @@ def get_train_and_prune(
 def get_iterative_train_and_prune(
     amount: float = 0.3,
     pruning_method: str = "base",
-) -> Callable[[Module, DataLoader, dict, Path], tuple[int, dict]]:
+) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
     """Return the training loop with one step pruning after every epoch."""
     # ? Must be moved to hydra?
     if pruning_method == "base":
@@ -299,6 +320,7 @@ def get_iterative_train_and_prune(
 
         parameters_to_prune = get_parameters_to_prune(net)
         per_epoch_amount = amount / config.epochs
+
         for _ in range(config.epochs):
             metrics = train_one_epoch(
                 net=net,
@@ -314,6 +336,8 @@ def get_iterative_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
+
+        # reorder keys
 
         return metrics
 
@@ -336,7 +360,7 @@ class TestConfig(BaseModel):
 
 
 def test(
-    net: Module,
+    net: nn.Module,
     testloader: DataLoader,
     _config: dict,
     _working_dir: Path,
@@ -432,7 +456,7 @@ def get_fed_eval_fn(
 
     def fed_eval_fn(
         _server_round: int,
-        parameters: NDArrays,
+        parameters: NDArrays,  # sbagliati!
         fake_config: dict,
     ) -> tuple[float, dict] | None:
         """Evaluate the model on the given data.
@@ -452,7 +476,11 @@ def get_fed_eval_fn(
             The loss and the accuracy of the input model on the given data.
         """
         net = net_generator(config.net_config)
+
+        # log_print_layer(net, "fed_eval_fn")
+
         generic_set_parameters(net, parameters)
+
         config.run_config["device"] = obtain_device()
 
         if len(cast(Sized, testloader.dataset)) == 0:
@@ -464,6 +492,7 @@ def get_fed_eval_fn(
             config.run_config,
             working_dir,
         )
+
         return loss, metrics
 
     return fed_eval_fn

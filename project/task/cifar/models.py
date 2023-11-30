@@ -227,17 +227,21 @@ def get_parameters_to_prune(
         name: str,
     ) -> None:
         if (
-            type(module)
-            == PowerPropConv2D | type(module)
-            == PowerPropLinear | type(module)
-            == nn.Conv2d | type(module)
-            == nn.Linear | type(module)
-            == SWATConv2D | type(module)
-            == SWATLinear
+            type(module) == PowerPropConv2D
+            or type(module) == PowerPropLinear
+            or type(module) == nn.Conv2d
+            or type(module) == nn.Linear
+            or type(module) == SWATConv2D
+            or type(module) == SWATLinear
         ):
+            # parameters_to_prune.append((module, "weight", name))
             parameters_to_prune.append((module, "weight", name))
-        for model, immediate_child_module in module.named_children():
-            add_immediate_child(immediate_child_module, model)
+
+        for _name, immediate_child_module in module.named_children():
+            add_immediate_child(immediate_child_module, _name)
+
+    # for layer_name, param in net.named_parameters():
+    # log(logging.DEBUG, f"layer name: {layer_name} has {param.shape}")
 
     add_immediate_child(net, "Net")
 
@@ -295,10 +299,11 @@ def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet1
     return generated_net
 
 
-def get_network_generator_resnet_swat(
-    alpha: float = 2.0, sparsity: float = 0.3
-) -> Callable[[], NetCifarResnet18]:
+def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
+    alpha: float = 2.0
+    sparsity: float = 0.3
+
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
     replace_layer_with_swat(
         module=untrained_net,
@@ -317,7 +322,7 @@ def get_network_generator_resnet_swat(
 
     init_model(untrained_net)
 
-    def generated_net() -> NetCifarResnet18:
+    def generated_net(_config: dict) -> NetCifarResnet18:
         """Net generator."""
         return deepcopy(untrained_net)
 

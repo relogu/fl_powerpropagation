@@ -1,9 +1,9 @@
 ---
 # Federated setup
-num_rounds: 5
+num_rounds: 3
 num_total_clients: 10
-num_clients_per_round: 4
-num_evaluate_clients_per_round: 4
+num_clients_per_round: 2
+num_evaluate_clients_per_round: 2
 
 # If clients should be sampled with replacement
 # when the dataset is not large enough
@@ -11,7 +11,7 @@ enable_resampling: false
 
 # Client resources
 cpus_per_client: 4
-gpus_per_client: 0.25
+gpus_per_client: 1
 
 # Seed for client selection
 seed: 1337
@@ -21,7 +21,7 @@ seed: 1337
 
 # If the server should try to load saved parameters, if it fails it will do the normal procedure of generating a random net
 # Leave on as true in case you need to enable checkpointing later on
-load_saved_parameters: true
+load_saved_parameters: false
 # The round from which to load the parameters
 # if null it will load the most recent round
 parameters_round: null
