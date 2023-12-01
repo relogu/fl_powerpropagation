@@ -18,12 +18,12 @@ from torchvision.datasets import CIFAR10
 def _download_data(
     dataset_dir: Path,
 ) -> tuple[CIFAR10, CIFAR10]:  # ?
-    """Download (if necessary) and returns the MNIST dataset.
+    """Download (if necessary) and returns the CIFAR10 dataset.
 
     Returns
     -------
-    Tuple[MNIST, MNIST]
-        The dataset for training and the dataset for testing MNIST.
+    Tuple[CIFAR10, CIFAR10]
+        The dataset for training and the dataset for testing CIFAR10.
     """
     transform = transforms.Compose([
         transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
@@ -80,7 +80,7 @@ def _partition_data(
 
     Returns
     -------
-    Tuple[List[MNIST], MNIST]
+    Tuple[List[CIFAR10], CIFAR10]
         A list of dataset for each client and a single dataset to be used for testing
         the model.
     """
@@ -157,14 +157,14 @@ def _balance_classes(
 
     Parameters
     ----------
-    trainset : MNIST
+    trainset : CIFAR10
         The training dataset that needs to be balanced.
     seed : int, optional
         Used to set a fix seed to replicate experiments, by default 42.
 
     Returns
     -------
-    MNIST
+    CIFAR10
         The balanced training dataset.
     """
     class_counts = np.bincount(trainset.targets)
@@ -215,42 +215,37 @@ def _sort_by_class(
 
     Parameters
     ----------
-    trainset : MNIST #?
+    trainset : CIFAR10
         The training dataset that needs to be sorted.
 
     Returns
     -------
-    MNIST
+    CIFAR10
         The sorted training dataset.
     """
-    class_counts = np.bincount(trainset.targets)
-    idxs = trainset.targets.argsort()  # sort targets in ascending order
+    class_counts = torch.bincount(torch.tensor(trainset.targets))
+    idxs = torch.argsort(
+        torch.tensor(trainset.targets)
+    )  # sort targets in ascending order
 
-    tmp = []  # create subset of smallest class
+    tmp = []  # create a subset of the smallest class
     tmp_targets = []  # same for targets
 
     start = 0
-    for count in np.cumsum(class_counts):
+    for count in torch.cumsum(class_counts, dim=0):
         tmp.append(
             Subset(
                 trainset,
-                cast(
-                    Sequence[int],
-                    idxs[start : int(count + start)],
-                ),
-            ),
+                list(idxs[start : int(count + start)]),
+            )
         )  # add rest of classes
         tmp_targets.append(
-            trainset.targets[idxs[start : int(count + start)]],
+            torch.tensor(trainset.targets)[idxs[start : int(count + start)]],
         )
-        start += count
-    sorted_dataset = cast(
-        CIFAR10,
-        ConcatDataset(tmp),
-    )  # concat dataset
-    sorted_dataset.targets = torch.cat(
-        tmp_targets,
-    )  # concat targets
+        start += count.item()
+
+    sorted_dataset = ConcatDataset(tmp)  # concat dataset
+    sorted_dataset.targets = torch.cat(tmp_targets)  # concat targets
     return sorted_dataset
 
 
@@ -270,7 +265,7 @@ def _power_law_split(
 
     Parameters
     ----------
-    sorted_trainset : MNIST #?
+    sorted_trainset : CIFAR10
         The training dataset sorted by label/class.
     num_partitions: int
         Number of partitions to create
@@ -287,7 +282,7 @@ def _power_law_split(
 
     Returns
     -------
-    MNIST
+    CIFAR10
         The partitioned training dataset.
     """
     targets = sorted_trainset.targets

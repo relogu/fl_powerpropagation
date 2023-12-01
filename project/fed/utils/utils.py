@@ -357,8 +357,11 @@ def log_print_layer(net: nn.Module, msg: str) -> None:
         {k: torch.tensor(v) for k, v in params_dict},
     )
 
-    # log(logging.DEBUG, 'net.fc.weight:%s', state_dict['net.fc.weight'])
-    log(logging.DEBUG, "%s; net.fc.bias:%s", msg, state_dict["net.fc.bias"])
+    log(logging.DEBUG, "%s; net.fc.weight:%s", msg, state_dict["net.fc.weight"])
+    # log(logging.DEBUG, "%s; net.fc.bias:%s", msg, state_dict["net.fc.bias"])
+
+    # print(f"{msg}; net.fc.weight:{state_dict['net.fc.weight']}")
+    # print(f"{msg}; net.fc.bias:{state_dict['net.fc.bias']}")
 
 
 def get_and_set_test(net: nn.Module, _config: dict) -> None:

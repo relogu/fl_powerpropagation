@@ -305,6 +305,7 @@ def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
     sparsity: float = 0.3
 
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+
     replace_layer_with_swat(
         module=untrained_net,
         name="NetCifarResnet18",

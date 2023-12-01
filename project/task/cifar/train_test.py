@@ -5,8 +5,11 @@ Problems:
     Since is not used I'm putting :int.
 """
 
+from collections import OrderedDict
+from copy import deepcopy
 from logging import ERROR
 from collections.abc import Callable
+import logging
 
 
 from flwr.common import log
@@ -19,7 +22,6 @@ from typing import cast
 import torch
 from pydantic import BaseModel
 from project.task.cifar.models import (
-    get_network_generator_resnet_powerprop,
     get_parameters_to_prune,
 )
 from torch import nn
@@ -30,7 +32,7 @@ from torch.utils.data import DataLoader
 from flwr.common import NDArrays
 
 from project.client.client import ClientConfig
-from project.fed.utils.utils import generic_set_parameters, load_net
+from project.fed.utils.utils import generic_set_parameters
 from project.types.common import (
     FedDataloaderGen,
     FedEvalFN,
@@ -248,20 +250,11 @@ def get_train_and_prune(
         _working_dir: Path,
     ) -> tuple[int, dict]:
         """Training and pruning process."""
-        # if config.cifar.model_and_data == "CIFAR_POWERPROP":
-        get_net: NetGen = get_network_generator_resnet_powerprop()
-        # elif config.task.cifar.model_and_data == "CIFAR_SWAT":
-        # get_net: NetGen = get_network_generator_resnet_swat()
+        log(logging.DEBUG, "Start training")
 
-        # Creating new net for training and pruning,
-        # since the latter mess up the order of the layer
+        _net = deepcopy(net)
+        original_dict = net.state_dict()
 
-        _net = get_net(_config)
-
-        # Initialize the new net with the older one (trained)
-        load_net(net1=net, net2=_net)
-
-        # Training & pruning on new net
         parameters_to_prune = get_parameters_to_prune(_net)
 
         metrics = train(
@@ -276,17 +269,23 @@ def get_train_and_prune(
                 (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
             ],
             pruning_method=pruning_method,
-            # amount=amount,
+            amount=amount,
         )
 
         for module, name, _ in parameters_to_prune:
             prune.remove(module, name)
 
-        load_net(net1=_net, net2=net)
+        # restoring correct layer's order
+        pruned_state_dict = _net.state_dict()
+        reodered_state_dict = OrderedDict()
+        for name in original_dict:
+            if name in pruned_state_dict:
+                reodered_state_dict[name] = pruned_state_dict[name]
 
-        # log_print_layer(net, "[train_and_prune] net")
-        # log(logging.DEBUG,'[train_and_prune] net keys:%s\n\n',
-        # net.state_dict().keys())
+        # Load the updated weights and correct layer order back into the original model
+        net.load_state_dict(reodered_state_dict)
+
+        torch.cuda.empty_cache()
 
         return metrics
 
@@ -313,8 +312,6 @@ def get_iterative_train_and_prune(
         _working_dir: Path,
     ) -> tuple[int, dict]:
         """Training and pruning Iterative."""
-        # ? How can I call the training with one epoch?
-
         config: TrainConfig = TrainConfig(**_config)
         # del _config
 
@@ -336,8 +333,6 @@ def get_iterative_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
-
-        # reorder keys
 
         return metrics
 

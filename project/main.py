@@ -46,6 +46,7 @@ from project.utils.utils import (
 # Make debugging easier when using Hydra + Ray
 os.environ["HYDRA_FULL_ERROR"] = "1"
 os.environ["OC_CAUSE"] = "1"
+os.environ["RAY_MEMORY_MONITOR_REFRESH_MS"] = "0"
 
 
 @hydra.main(

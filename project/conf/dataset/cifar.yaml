@@ -19,7 +19,7 @@ seed: 1337
 
 # If the partition labels 
 # should be independent and identically distributed 
-iid: true  # to fix, bring back at false
+iid: false
 
 # If the partition labels should follow a power law
 # distribution

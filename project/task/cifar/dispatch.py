@@ -76,7 +76,7 @@ def dispatch_train(
         and train_structure.upper() == "CIFAR_TRAIN_AND_PRUNE"
     ):
         return (
-            get_train_and_prune(amount=0.3, pruning_method="base"),
+            get_train_and_prune(amount=0.3, pruning_method="l1"),
             test,
             get_fed_eval_fn,
         )

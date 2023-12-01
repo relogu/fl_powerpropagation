@@ -11,7 +11,7 @@ enable_resampling: false
 
 # Client resources
 cpus_per_client: 4
-gpus_per_client: 1
+gpus_per_client: 0.5
 
 # Seed for client selection
 seed: 1337
@@ -21,7 +21,7 @@ seed: 1337
 
 # If the server should try to load saved parameters, if it fails it will do the normal procedure of generating a random net
 # Leave on as true in case you need to enable checkpointing later on
-load_saved_parameters: false
+load_saved_parameters: true
 # The round from which to load the parameters
 # if null it will load the most recent round
 parameters_round: null
