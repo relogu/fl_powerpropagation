@@ -27,7 +27,7 @@ from project.task.cifar.models import (
     get_network_generator_resnet_powerprop,
     get_network_generator_resnet_swat,
 )
-from project.task.cifar.train_test import get_fed_eval_fn, test, train
+from project.task.cifar.train_test import get_fed_eval_fn, get_train, test
 from project.task.cifar.train_test import (
     get_train_and_prune,
 )
@@ -65,9 +65,9 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "CIFAR_BASE":
+    if train_structure is not None and train_structure.upper() == "CIFAR_TRAIN":
         return (
-            train,
+            get_train,
             test,
             get_fed_eval_fn,
         )

@@ -234,14 +234,10 @@ def get_parameters_to_prune(
             or type(module) == SWATConv2D
             or type(module) == SWATLinear
         ):
-            # parameters_to_prune.append((module, "weight", name))
             parameters_to_prune.append((module, "weight", name))
 
         for _name, immediate_child_module in module.named_children():
             add_immediate_child(immediate_child_module, _name)
-
-    # for layer_name, param in net.named_parameters():
-    # log(logging.DEBUG, f"layer name: {layer_name} has {param.shape}")
 
     add_immediate_child(net, "Net")
 
@@ -270,13 +266,9 @@ def get_network_generator_resnet() -> Callable[[], NetCifarResnet18]:
     return generated_net
 
 
-# ? This must be changed. Since only return a simple resnet18 without modified layer
-get_net: NetGen = lazy_config_wrapper(NetCifarResnet18)
-
-
 def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet18]:
     """Powerprop Resnet generator."""
-    alpha: float = 2.0
+    alpha: float = 4.0
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
     replace_layer_with_powerprop(
         module=untrained_net,
@@ -301,8 +293,8 @@ def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet1
 
 def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
-    alpha: float = 2.0
-    sparsity: float = 0.3
+    alpha: float = 2
+    sparsity: float = 0.7
 
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
 

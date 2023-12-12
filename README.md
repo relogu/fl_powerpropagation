@@ -134,3 +134,9 @@ To enable Continous Integration of your project via Pre-commit, all you need to 
 ## Long-term Public Projects
 
 If you intend your project to run over multiple years and it does not require a private repository, prefer forking this codebase and creating your project as a branch. This will allow you to keep up to date with the latest changes to the template by syncing the main branch and merging it into your private branch.
+
+## TO DO 
+
+- fixing the threshold in the swat module
+- reorder and divide the code. Powerprop, SWAT and maybe a combination of the two. In this way would be easer to run some exp
+- find a way to mesure pruning in powerprop

@@ -5,7 +5,10 @@ import struct
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from pathlib import Path
-from project.task.cifar.models import get_network_generator_resnet_powerprop
+
+import torch.nn.functional as F
+
+import numpy as np
 
 import torch
 from flwr.common import (
@@ -40,15 +43,17 @@ def generic_set_parameters(
     -------
     None
     """
+    sorted_dict = sorted(net.state_dict().items(), key=lambda x: x[0])  # Sort by keys
+
     params_dict = zip(
-        net.state_dict().keys(),
+        (keys for keys, _ in sorted_dict),
         parameters,
         strict=False,
     )
     state_dict = OrderedDict(
         # {k: torch.Tensor(v if not to_copy else v.copy()) for k, v in params_dict},
         # The commented version raise an error: !?
-        # IndexError: index 0 is out of bounds for dimension 0 with size 0
+        # IndexError: index 0 is out of bounds for dimension 0 with size 0 ?
         {k: torch.tensor(v if not to_copy else v.copy()) for k, v in params_dict},
     )
 
@@ -68,24 +73,10 @@ def generic_get_parameters(net: nn.Module) -> NDArrays:
         NDArrays
         The parameters of the network.
     """
-    """get_net: NetGen = get_network_generator_resnet_powerprop()
-    config = None
-    _net = get_net(_config=config)
-    # Get the parameter from the old net (wrong order)
-    parameters = [val.cpu().numpy() for _, val in net.state_dict().items()]
-    # Create the dict with the unordered parameter
-    params_dict = zip(
-        net.state_dict().keys(),
-        parameters,
-        # strict=False,
-    )
-    state_dict = OrderedDict({k: torch.tensor(v.copy()) for k, v in params_dict})
-    # Insert the unordered parameter in the new net
-    _net.load_state_dict(state_dict)
-    # Extract the parameter from the ordered net
-    parameters = [val.cpu().numpy() for _, val in _net.state_dict().items()]"""
-
-    parameters = [val.cpu().numpy() for _, val in net.state_dict().items()]
+    state_dict_items = sorted(
+        net.state_dict().items(), key=lambda x: x[0]
+    )  # Sort by keys
+    parameters = [val.cpu().numpy() for _, val in state_dict_items]
 
     return parameters
 
@@ -344,58 +335,109 @@ def test_client(
                 )
 
 
-def log_print_layer(net: nn.Module, msg: str) -> None:
-    """Print some layar of the given net, along side of the message."""
-    # log(logging.DEBUG, msg)
-    parameters = [val.cpu().numpy() for _, val in net.state_dict().items()]
-    params_dict = zip(
-        net.state_dict().keys(),
-        parameters,
-        strict=True,
-    )
-    state_dict = OrderedDict(
-        {k: torch.tensor(v) for k, v in params_dict},
+def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> None:
+    """Count the rate of different parameter between two network."""
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() else "cpu",
     )
 
-    log(logging.DEBUG, "%s; net.fc.weight:%s", msg, state_dict["net.fc.weight"])
-    # log(logging.DEBUG, "%s; net.fc.bias:%s", msg, state_dict["net.fc.bias"])
+    net1.to(device)
+    net2.to(device)
 
-    # print(f"{msg}; net.fc.weight:{state_dict['net.fc.weight']}")
-    # print(f"{msg}; net.fc.bias:{state_dict['net.fc.bias']}")
+    state_dict1 = net1.state_dict()
+    state_dict2 = net2.state_dict()
 
+    # for k in state_dict1.keys():
+    for k in state_dict1:
+        state_dict1[k] = torch.sub(state_dict1[k], state_dict2[k], alpha=1)
 
-def get_and_set_test(net: nn.Module, _config: dict) -> None:
-    """Check of the correct functionality of get and set parameters."""
-    get_net: NetGen = get_network_generator_resnet_powerprop()
-    _net = get_net(_config)
-
-    parameters = generic_get_parameters(net)
-    """params_dict = zip( _net.state_dict().keys(), parameters,
-
-    strict=False, )
-
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-    """
+    nz_count = 0
+    total_params = 0
+    # for k in state_dict1.keys():
+    for k in state_dict1:
+        nz, param = nonzeros_tensor(state_dict1[k])
+        nz_count += nz
+        total_params += param
 
     log(
-        logging.DEBUG,
-        "[get_and_set_test] (from GET) net.fc.bias: %s",
-        len(_net.state_dict().keys()),
+        logging.INFO,
+        f"[{msg}] Modified: {nz_count:7}, Equal: {total_params - nz_count:7}, total:"
+        f" {total_params:7},"
+        f" ({100 - 100 * (total_params - nz_count) / total_params:6.2f}% Modified)",
     )
 
-    generic_set_parameters(net=_net, parameters=parameters)
+
+def nonzeros_tensor(p: torch.tensor) -> tuple[int, int]:
+    """Count the rate of non-zero parameter in a tensor."""
+    tensor = p.data.cpu().numpy()
+    nz_count = np.count_nonzero(tensor)
+    total_params = np.prod(tensor.shape)
+    return nz_count, total_params
 
 
-def load_net(net1: nn.Module, net2: nn.Module) -> None:
-    """Load net1 parameters into net2."""
-    # Extracting the parameter from _net
-    parameters = [val.cpu().numpy() for _, val in net1.state_dict().items()]
-    # Create the dict with the unordered parameter
-    params_dict = zip(
-        net1.state_dict().keys(),
-        parameters,
-        strict=False,
+def print_nonzeros_tensor(p: torch.tensor, msg: str = "") -> float:
+    """Print the count the rate of non-zero parameter in a tensor."""
+    nz_count, total_params = nonzeros_tensor(p)
+    log(
+        logging.INFO,
+        f"{msg}       nonzeros ="
+        f" {nz_count:7}/{total_params:7} ({100 * nz_count / total_params:6.2f}%) |"
+        f" total_pruned = {total_params - nz_count:7} | shape = {p.shape}",
     )
-    state_dict = OrderedDict({k: torch.tensor(v.copy()) for k, v in params_dict})
-    # Insert the unordered parameter in the old (ordered) net
-    net2.load_state_dict(state_dict)
+    return round((nz_count / total_params) * 100, 1)
+
+
+def print_nonzeros(model: nn.Module, msg: str = "") -> float:
+    """Print the rate of non-zero parameter in a model."""
+    nonzero = total = 0
+    for _, p in model.named_parameters():
+        tensor = p.data.cpu().numpy()
+        nz_count = np.count_nonzero(tensor)
+        total_params = np.prod(tensor.shape)
+        nonzero += nz_count
+        total += total_params
+    log(
+        logging.INFO,
+        f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
+        f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
+    )
+    return round(((total - nonzero) / total) * 100, 1)
+
+
+def print_nonzeros_grad(model: nn.Module, msg: str = "") -> float:
+    """Count the rate of non-zero parameter in a model."""
+    nonzero = total = 0
+    for _, p in model.named_parameters():
+        tensor = p.grad.cpu().numpy()
+        nz_count = np.count_nonzero(tensor)
+        total_params = np.prod(tensor.shape)
+        nonzero += nz_count
+        total += total_params
+    log(
+        logging.INFO,
+        f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
+        f" Compression rate : {total / nonzero:10.2f}x "
+        f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
+    )
+    return round((nonzero / total) * 100, 1)
+
+
+def generate_random_state_dict(
+    model: nn.Module, seed: int = 42, sparsity: float = 0.0
+) -> OrderedDict:
+    """Generate a random, eventually sparse, state dict for a model."""
+    # Set seed for reproducibility
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    random_state_dict = OrderedDict()
+
+    # Create random tensors matching the shapes of the model parameters
+    for key, data in model.state_dict().items():
+        random_tensor = torch.randn(
+            data.shape
+        )  # Create a random tensor with the same shape
+        random_tensor = F.dropout(random_tensor, sparsity)
+        random_state_dict[key] = random_tensor
+
+    return random_state_dict

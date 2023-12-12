@@ -5,7 +5,6 @@ Problems:
     Since is not used I'm putting :int.
 """
 
-from collections import OrderedDict
 from copy import deepcopy
 from logging import ERROR
 from collections.abc import Callable
@@ -60,7 +59,6 @@ class TrainConfig(BaseModel):
 
 
 def train(
-    # self: None,  #? Necessary since the implementation of the `main.py`
     net: nn.Module,
     trainloader: DataLoader,
     _config: dict,
@@ -94,13 +92,14 @@ def train(
     del _config
 
     net.to(config.device)
+    # _net = deepcopy(net)
     net.train()
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.001,  # ?
+        weight_decay=0,  # ?
     )
 
     final_epoch_per_sample_loss = 0.0
@@ -115,11 +114,11 @@ def train(
                 ),
                 target.to(config.device),
             )
-            optimizer.zero_grad()
             output = net(data)
             loss = criterion(output, target)
             final_epoch_per_sample_loss += loss.item()
             num_correct += (output.max(1)[1] == target).clone().detach().sum().item()
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
@@ -131,8 +130,31 @@ def train(
     }
 
 
+def get_train(
+    net: nn.Module,
+    trainloader: DataLoader,
+    _config: dict,
+    _working_dir: Path,
+) -> tuple[int, dict]:
+    """Training.
+
+    It actually simple training
+    """
+    # print(f"[get_train]     Starting training")
+    # start_time = time.time()
+
+    metrics = train(
+        net=net,
+        trainloader=trainloader,
+        _config=_config,
+        _working_dir=_working_dir,
+    )
+    # print(f"[get_train]     It took {int(time.time() - start_time)}s to run")
+
+    return metrics
+
+
 def train_one_epoch(
-    # self: None,  #? Necessary since the implementation of the `main.py`
     net: nn.Module,
     trainloader: DataLoader,
     _config: dict,
@@ -196,6 +218,73 @@ def train_one_epoch(
     }
 
 
+def train_swat_test(
+    net: nn.Module,
+    data: torch,
+    target: torch,
+    _config: dict,
+) -> tuple[int, dict]:
+    """Train the network on the training set.
+
+    Parameters
+    ----------
+    net : nn.Module
+        The neural network to train.
+    trainloader : DataLoader
+        The DataLoader containing the data to train the network on.
+    _config : Dict
+        The configuration for the training.
+        Contains the device, number of epochs and learning rate.
+        Static type checking is done by the TrainConfig class.
+
+    Returns
+    -------
+    Tuple[int, Dict]
+        The number of samples used for training,
+        the loss, and the accuracy of the input model on the given data.
+    """
+    config: TrainConfig = TrainConfig(**_config)
+    del _config
+
+    net.to(config.device)
+    # net.train()
+
+    _net = deepcopy(net)
+
+    # Forward pass
+    output = net(data)
+
+    # net_compare(net, _net, "train")
+
+    # Backward pass
+    # Loss function
+    criterion = nn.CrossEntropyLoss()
+
+    # Loss
+    loss = criterion(output, target)
+
+    # Backpropagation
+    # print("[train] Starting backpropagation\n")
+    net.zero_grad()
+    loss.backward()
+    # time.sleep(20)
+    # net_compare(net, _net, "train")
+
+    # Upadate weights
+    optimizer = torch.optim.SGD(
+        net.parameters(),
+        lr=config.learning_rate,
+        weight_decay=0.001,  # ?
+    )
+    optimizer.step()
+    # net_compare(net, _net, "train")
+
+    return 1, {
+        # "train_loss": loss,
+        "train_accuracy": (output.max(1)[1] == target).clone().detach().sum().item(),
+    }
+
+
 def get_train_with_hooks() -> (
     Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]
 ):
@@ -252,13 +341,12 @@ def get_train_and_prune(
         """Training and pruning process."""
         log(logging.DEBUG, "Start training")
 
-        _net = deepcopy(net)
-        original_dict = net.state_dict()
+        parameters_to_prune = get_parameters_to_prune(net)
 
-        parameters_to_prune = get_parameters_to_prune(_net)
+        # start_time = time.time()
 
         metrics = train(
-            net=_net,
+            net=net,
             trainloader=trainloader,
             _config=_config,
             _working_dir=_working_dir,
@@ -274,18 +362,6 @@ def get_train_and_prune(
 
         for module, name, _ in parameters_to_prune:
             prune.remove(module, name)
-
-        # restoring correct layer's order
-        pruned_state_dict = _net.state_dict()
-        reodered_state_dict = OrderedDict()
-        for name in original_dict:
-            if name in pruned_state_dict:
-                reodered_state_dict[name] = pruned_state_dict[name]
-
-        # Load the updated weights and correct layer order back into the original model
-        net.load_state_dict(reodered_state_dict)
-
-        torch.cuda.empty_cache()
 
         return metrics
 
@@ -471,8 +547,6 @@ def get_fed_eval_fn(
             The loss and the accuracy of the input model on the given data.
         """
         net = net_generator(config.net_config)
-
-        # log_print_layer(net, "fed_eval_fn")
 
         generic_set_parameters(net, parameters)
 

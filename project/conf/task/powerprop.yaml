@@ -14,7 +14,7 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 64
+    batch_size: 128
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 5
@@ -27,8 +27,8 @@ eval_config:
   net_config: {}
   # The testing function batch size can be as high as the GPU supports
   dataloader_config:
-    batch_size: 256
-  # Unlike train, the mnist train function takes no parameters?
+    batch_size: 128
+  # Unlike train, the mnist train function takes no parameters
   run_config: {}
   extra: {}
 
@@ -39,7 +39,7 @@ fed_test_config:
   # The testing function batch size can be as high as the GPU supports
   dataloader_config:
     batch_size: 256
-  # Unlike train, the mnist train function takes no parameters?
+  # Unlike train, the mnist train function takes no parameters
   run_config: {}
   extra: {}
 

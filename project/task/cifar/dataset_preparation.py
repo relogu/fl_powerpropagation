@@ -222,10 +222,12 @@ def _sort_by_class(
     -------
     CIFAR10
         The sorted training dataset.
+
+    ??? changet tensor to Tensto
     """
     class_counts = torch.bincount(torch.tensor(trainset.targets))
     idxs = torch.argsort(
-        torch.tensor(trainset.targets)
+        torch.Tensor(trainset.targets)
     )  # sort targets in ascending order
 
     tmp = []  # create a subset of the smallest class
@@ -240,7 +242,7 @@ def _sort_by_class(
             )
         )  # add rest of classes
         tmp_targets.append(
-            torch.tensor(trainset.targets)[idxs[start : int(count + start)]],
+            torch.Tensor(trainset.targets)[idxs[start : int(count + start)]],
         )
         start += count.item()
 

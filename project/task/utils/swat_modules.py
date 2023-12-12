@@ -2,7 +2,9 @@
 TODO:
 """
 
+from copy import deepcopy
 from typing import Union
+
 
 import torch
 from torch import nn
@@ -21,11 +23,14 @@ from project.task.utils.drop import (
     matrix_drop,
 )
 
+torch.autograd.set_detect_anomaly(True)
+
 
 class swat_linear(Function):
     @staticmethod
     def forward(ctx, input, weight, bias, sparsity):
-        sparse_weight = matrix_drop(weight, 1 - sparsity)
+        sparse_weight = weight  # matrix_drop(weight, 1 - sparsity)
+
         if input.dim() == 2 and bias is not None:
             # The fused op is marginally faster
             output = torch.addmm(bias, input, sparse_weight.t())
@@ -34,12 +39,18 @@ class swat_linear(Function):
             if bias is not None:
                 output += bias
         sparse_input = matrix_drop(input, 1 - sparsity)
+
+        # print(f"[swat_linear.forward] weight: {nonzeros_rate(weight)} sparse_weight: {nonzeros_rate(sparse_weight)}")
+        # print(f"[swat_linear.forward] input: {nonzeros_rate(input)} sparse_input: {nonzeros_rate(sparse_input)}")
+        # print(f"[swat_linear.forward] output: {nonzeros_rate(output)}\n")
+
         ctx.save_for_backward(sparse_input, sparse_weight, bias)
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
         sparse_input, sparse_weight, bias = ctx.saved_tensors
+
         grad_input = grad_weight = grad_bias = None
 
         if ctx.needs_input_grad[0]:
@@ -48,6 +59,10 @@ class swat_linear(Function):
             grad_weight = grad_output.t().mm(sparse_input)
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum(0)
+
+        # print(f"[swat_linear.backward] grad_output: {nonzeros_rate(grad_output)}")#grad_bias: {nonzeros_rate(grad_bias)}\n")
+        # print(f"[swat_linear.backward] sparse_input: {nonzeros_rate(sparse_input)} sparse_weight: {nonzeros_rate(sparse_weight)} ")#bias: {nonzeros_rate(bias)}")
+        # print(f"[swat_linear.backward] grad_input: {nonzeros_rate(grad_input)} grad_weight: {nonzeros_rate(grad_weight)}\n")#grad_bias: {nonzeros_rate(grad_bias)}\n")
 
         return grad_input, grad_weight, grad_bias, None
 
@@ -67,6 +82,7 @@ def convolution_backward(
     ) = (
         grad_in_th
     ) = grad_wt_th = stride_grad = padding_grad = dilation_grad = groups_grad = None
+
     # Compute gradient w.r.t. input
     if ctx.needs_input_grad[0]:
         input_grad = conv2d_input(
@@ -78,6 +94,7 @@ def convolution_backward(
             conf["dilation"],
             conf["groups"],
         )
+
     # Compute gradient w.r.t. weight
     if ctx.needs_input_grad[1]:
         weight_grad = conv2d_weight(
@@ -92,6 +109,11 @@ def convolution_backward(
     # Compute gradient w.r.t. bias (works for every Conv2d shape)
     if bias is not None and ctx.needs_input_grad[2]:
         bias_grad = grad_output.sum(dim=(0, 2, 3))
+
+    # print(f"[swat_conv2d_unstructured.backward] grad_output: {nonzeros_rate(grad_output)}")
+    # print(f"[swat_conv2d_unstructured.backward] sparse_input: {nonzeros_rate(sparse_input)} ")#bias: {nonzeros_rate(bias)}")
+    # print(f"[swat_conv2d_unstructured.backward] grad_input: {nonzeros_rate(input_grad)} grad_weight: {nonzeros_rate(weight_grad)}\n")#grad_bias: {nonzeros_rate(bias_grad)}\n")
+
     return (
         input_grad,
         weight_grad,
@@ -121,40 +143,42 @@ class swat_conv2d_unstructured(Function):
         dilation,
         groups,
     ):
-        if wt_threshold < 0.0:
-            sparse_weight, wt_threshold = drop_nhwc_send_th(weight, 1 - sparsity)
-        else:
-            sparse_weight = drop_threshold(weight, wt_threshold)
-        # sparse_weight = torch.mul(weight, index)
         output = F.conv2d(
             input=input,
-            weight=sparse_weight,
-            # weight=weight,
+            weight=weight,
             bias=bias,
             stride=stride,
             padding=padding,
             dilation=dilation,
             groups=groups,
         )
+
         if in_threshold < 0.0:
-            sparse_input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity)
+            sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, 1 - sparsity)
+            in_threshold = in_threshold_tensor.item()
         else:
             sparse_input = drop_threshold(input, in_threshold)
-        # ctx.save_for_backward(input, weight, bias)
+
+        # print(f"[swat_conv2d_unstructured.forward] weight: {nonzeros_rate(weight)}")
+        # print(f"[swat_conv2d_unstructured.forward] input: {nonzeros_rate(input)} sparse_input: {nonzeros_rate(sparse_input)}")
+        # print(f"[swat_conv2d_unstructured.forward] output: {nonzeros_rate(output)}\n")
+
         ctx.conf = {
             "stride": stride,
             "padding": padding,
             "dilation": dilation,
             "groups": groups,
         }
-        # sparse_input = torch.mul(input, index)
-        ctx.save_for_backward(sparse_input, sparse_weight, bias)
-        return output, wt_threshold, in_threshold
+
+        ctx.save_for_backward(sparse_input, weight, bias)
+
+        return output, in_threshold
 
     # Use @once_differentiable by default unless we intend to double backward
     @staticmethod
-    # @once_differentiable
-    def backward(ctx, grad_output, grad_wt_th, grad_in_th):
+    @once_differentiable
+    # def backward(ctx, grad_output, grad_wt_th, grad_in_th):
+    def backward(ctx, grad_output, grad_in_th):
         # grad_output = grad_output.contiguous()
         return convolution_backward(ctx, grad_output)
 
@@ -283,14 +307,18 @@ class SWATLinear(nn.Module):
 
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
+        self.weight.data = matrix_drop(self.weight, self.sparsity)
+
         if self.alpha == 1.0:
             powerprop_weight = self.weight
         else:
             powerprop_weight = self.weight * torch.pow(
                 torch.abs(self.weight), self.alpha - 1.0
             )
+
         # Perform SWAT forward pass
         output = self._call_swat_linear(input, powerprop_weight)
+
         # Return the output
         return output
 
@@ -354,14 +382,14 @@ class SWATConv2D(nn.Module):
     def _call_swat_conv2d(self, input, weight) -> torch.Tensor:
         # TODO: Add the decision pipeline proposed in the original paper
         if self.pruning_type == "unstructured":
-            output, wt_threshold, in_threshold = swat_conv2d_unstructured.apply(
+            output, in_threshold = swat_conv2d_unstructured.apply(
                 input,
                 weight,
                 self.bias,
                 self.sparsity,
-                # deepcopy(self.in_threshold),
-                # deepcopy(self.wt_threshold),
                 self.in_threshold,
+                # self.in_threshold,
+                # deepcopy(self.wt_threshold),
                 self.wt_threshold,
                 self.stride,
                 self.padding,
@@ -396,24 +424,148 @@ class SWATConv2D(nn.Module):
             )
         else:
             assert 0, "Illegal Pruning Type"
-        # if self.epoch >= self.warmup:
-        #     if self.batch_idx % self.period == 0:
-        #         self.wt_threshold = wt_threshold
-        #         self.in_threshold = in_threshold
+
+        if self.epoch >= self.warmup:
+            if self.batch_idx % self.period == 0:
+                self.in_threshold = in_threshold
+
         return output
 
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
+        self.weight.data = drop_threshold(self.weight, self.sparsity)
+
+        if self.wt_threshold < 0.0:
+            self.weight.data, wt_threshold_tensor = drop_nhwc_send_th(
+                self.weight, 1 - self.sparsity
+            )
+            wt_threshold = wt_threshold_tensor.item()
+        else:
+            # sparse_weight = drop_threshold(weight, wt_threshold)
+            self.weight.data = drop_threshold(
+                self.weight, self.wt_threshold
+            )  # self.sparsity)
+            wt_threshold = self.wt_threshold
+
         if self.alpha == 1.0:
             powerprop_weight = self.weight
         else:
             powerprop_weight = self.weight * torch.pow(
                 torch.abs(self.weight), self.alpha - 1.0
             )
+
         # Perform SWAT forward pass
         output = self._call_swat_conv2d(
             input,
             powerprop_weight,
         )
+
+        if self.epoch >= self.warmup:
+            if self.batch_idx % self.period == 0:
+                self.wt_threshold = wt_threshold
+        # ? what's the meaning of batch_idx and epoch
+
         # Return the output
         return output
+
+
+# ?
+def grad_test():
+    log(INFO, "Test the gradients of SWATFunctions")
+    # gradcheck takes a tuple of tensors as input, check if your gradient
+    # evaluated with these tensors are close enough to numerical
+    # approximations and returns True if they all verify this condition.
+    log(INFO, "Set up fake inputs for `swat_linear` with sparsity level 0.0")
+    input = (
+        torch.randn(20, 20, dtype=torch.double, requires_grad=True),
+        torch.randn(10, 20, dtype=torch.double, requires_grad=True),
+        torch.randn(10, dtype=torch.double, requires_grad=True),
+        0.0,
+    )
+    log(INFO, "Run `grad_check` function for `swat_linear`")
+    test = gradcheck(swat_linear.apply, input, eps=1e-6, atol=1e-4)
+    log(INFO, f"Are the numerical gradients close enough? {test}")
+    log(INFO, "Set up fake inputs for `swat_linear` with sparsity level 0.5")
+    input = (
+        torch.randn(20, 20, dtype=torch.double, requires_grad=True),
+        torch.randn(10, 20, dtype=torch.double, requires_grad=True),
+        torch.randn(10, dtype=torch.double, requires_grad=True),
+        torch.tensor(0.5, dtype=torch.double, requires_grad=False),
+    )
+    log(INFO, "Run `grad_check` function for `swat_linear`")
+    # input = input.double()
+    test = gradcheck(
+        swat_linear.apply, input, eps=1e-6, atol=1e-4, raise_exception=False
+    )
+    log(INFO, f"Are the numerical gradients close enough? {test}")
+    log(INFO, "Set up fake inputs for `swat_conv2d_*` with sparsity level 0.0")
+    # (conv1): SWATConv2D(alpha=1, in_channels=3, out_channels=64, kernel_size=3, bias=False, stride=(1, 1), padding=(1, 1), dilation=1, groups=1, sparsity=0.3, pruning_type=unstructured, warm_up=0, period=1)
+    input = (
+        # torch.randn(1,3,32,32,dtype=torch.double,requires_grad=True),
+        # torch.randn(64,3,3,3,dtype=torch.double,requires_grad=True),
+        # torch.randn(64,dtype=torch.double,requires_grad=True), # Gradients are correct here
+        drop_nhwc_send_th(
+            torch.ones(1, 1, 3, 3, dtype=torch.double, requires_grad=True), 1.0
+        )[0],
+        drop_nhwc_send_th(
+            torch.ones(1, 1, 1, 2, dtype=torch.double, requires_grad=True), 1.0
+        )[0],
+        torch.zeros(
+            1, dtype=torch.double, requires_grad=True
+        ),  # Gradients are correct here
+        torch.tensor(0.000000, dtype=torch.double, requires_grad=False),
+        torch.tensor(-1.0, dtype=torch.double, requires_grad=False),
+        torch.tensor(-1.0, dtype=torch.double, requires_grad=False),
+        1,
+        0,
+        1,
+        1,
+    )
+    log(INFO, "Run `grad_check` function for `swat_conv2d_unstructured`")
+    test = gradcheck(
+        swat_conv2d_unstructured.apply,
+        input,
+        eps=1e-6,
+        atol=1e-4,
+        raise_exception=False,
+    )
+    log(INFO, f"Are the numerical gradients close enough? {test}")
+
+    # log(INFO, "Run `grad_check` function for `swat_conv2d_structured_filter`")
+    # test = gradcheck(swat_conv2d_structured_filter.apply, input, eps=1e-6, atol=1e-4, raise_exception=False)
+    # log(INFO, f"Are the numerical gradients close enough? {test}")
+
+    # log(INFO, "Run `grad_check` function for `swat_conv2d_structured_filter`")
+    # test = gradcheck(swat_conv2d_structured_filter.apply, input, eps=1e-6, atol=1e-4, raise_exception=False)
+    # log(INFO, f"Are the numerical gradients close enough? {test}")
+
+    # log(INFO, "Set up fake inputs for `swat_conv2d_*` with sparsity level 0.5")
+    # input = (
+    #     torch.randn(1,3,32,32,dtype=torch.double,requires_grad=True),
+    #     torch.randn(64,3,3,3,dtype=torch.double,requires_grad=True),
+    #     torch.randn(64,dtype=torch.double,requires_grad=True),
+    #     torch.Tensor([0.5]),
+    #     torch.Tensor([-1.0]),
+    #     torch.Tensor([-1.0]),
+    # )
+    # log(INFO, "Run `grad_check` function for `swat_conv2d_unstructured`")
+    # test = gradcheck(swat_conv2d_unstructured.apply, input, eps=1e-6, atol=1e-4, raise_exception=False)
+    # log(INFO, f"Are the numerical gradients close enough? {test}")
+
+    # log(INFO, "Run `grad_check` function for `swat_conv2d_structured_filter`")
+    # test = gradcheck(swat_conv2d_structured_filter.apply, input, eps=1e-6, atol=1e-4, raise_exception=False)
+    # log(INFO, f"Are the numerical gradients close enough? {test}")
+
+    # log(INFO, "Run `grad_check` function for `swat_conv2d_structured_filter`")
+    # test = gradcheck(swat_conv2d_structured_filter.apply, input, eps=1e-6, atol=1e-4, raise_exception=False)
+    # log(INFO, f"Are the numerical gradients close enough? {test}")
+
+    log(INFO, "Test the gradients of SWATFunctions finished!")
+
+
+if __name__ == "__main__":
+    from logging import INFO
+    from torch.autograd import gradcheck
+    from flwr.common.logger import log
+
+    grad_test()

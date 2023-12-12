@@ -13,9 +13,6 @@ from torch import nn
 import torch.nn.functional as F
 from torch.types import _int, _size
 
-import logging
-from flwr.common import log
-
 
 class PowerPropLinear(nn.Module):
     """Powerpropagation Linear module."""
