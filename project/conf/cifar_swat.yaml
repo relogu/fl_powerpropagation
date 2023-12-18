@@ -1,7 +1,7 @@
 ---
 defaults:
   - _self_
-  - task: cifar
+  - task: swat
   - fed: cifar
   - strategy: fedavg
   - dataset: cifar

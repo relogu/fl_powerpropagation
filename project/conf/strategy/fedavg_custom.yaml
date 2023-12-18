@@ -1,0 +1,5 @@
+---
+name: FedAvg
+
+init:
+  _target_: project.fed.server.strategy.fedavg_custom.FedAvg

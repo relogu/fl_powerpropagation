@@ -193,7 +193,8 @@ exclude = [
     "node_modules",
     "venv",
     "proto",
-    "project/task/utils"
+    "project/task/utils",
+    "project/fed/server/strategy/fedavg_custom.py"
 ]
 
 [tool.ruff.format]

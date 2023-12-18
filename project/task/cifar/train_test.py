@@ -9,6 +9,7 @@ from copy import deepcopy
 from logging import ERROR
 from collections.abc import Callable
 import logging
+import time
 
 
 from flwr.common import log
@@ -39,6 +40,14 @@ from project.types.common import (
     TestFunc,
 )
 from project.utils.utils import obtain_device
+
+# from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
+from project.task.default.train_test import (
+    get_on_evaluate_config_fn as get_default_on_evaluate_config_fn,
+)
+from project.task.default.train_test import (
+    get_on_fit_config_fn as get_default_on_fit_config_fn,
+)
 
 
 class TrainConfig(BaseModel):
@@ -141,7 +150,7 @@ def get_train(
     It actually simple training
     """
     # print(f"[get_train]     Starting training")
-    # start_time = time.time()
+    start_time = time.time()
 
     metrics = train(
         net=net,
@@ -149,7 +158,7 @@ def get_train(
         _config=_config,
         _working_dir=_working_dir,
     )
-    # print(f"[get_train]     It took {int(time.time() - start_time)}s to run")
+    log(logging.INFO, f"[get_train] It took {int(time.time() - start_time)}s to run")
 
     return metrics
 
@@ -527,7 +536,7 @@ def get_fed_eval_fn(
 
     def fed_eval_fn(
         _server_round: int,
-        parameters: NDArrays,  # sbagliati!
+        parameters: NDArrays,
         fake_config: dict,
     ) -> tuple[float, dict] | None:
         """Evaluate the model on the given data.
@@ -547,9 +556,7 @@ def get_fed_eval_fn(
             The loss and the accuracy of the input model on the given data.
         """
         net = net_generator(config.net_config)
-
         generic_set_parameters(net, parameters)
-
         config.run_config["device"] = obtain_device()
 
         if len(cast(Sized, testloader.dataset)) == 0:
@@ -565,3 +572,10 @@ def get_fed_eval_fn(
         return loss, metrics
 
     return fed_eval_fn
+
+
+# Use defaults as they are completely determined
+# by the other functions defined in mnist_classification
+# get_fed_eval_fn = get_default_fed_eval_fn
+get_on_fit_config_fn = get_default_on_fit_config_fn
+get_on_evaluate_config_fn = get_default_on_evaluate_config_fn

@@ -1,18 +1,18 @@
-"""Define our models, and training and eval functions."""
+"""CNN model architecture, training, and testing functions for MNIST."""
 
-from copy import deepcopy
-from collections.abc import Iterable
-from collections.abc import Callable
-
-import numpy as np
 import torch
 import torch.nn.functional as F
-
 from torch import nn
-from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
-from project.task.utils.swat_modules import SWATConv2D, SWATLinear
+import numpy as np
+
+from copy import deepcopy
+from collections.abc import Callable
+
 from project.types.common import NetGen
 from project.utils.utils import lazy_config_wrapper
+
+
+from project.task.utils.swat_modules import SWATConv2D, SWATLinear
 from torchvision.models import resnet18
 
 
@@ -91,12 +91,7 @@ def init_weights(module: nn.Module) -> None:
     """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
     if isinstance(
         module,
-        PowerPropLinear
-        | PowerPropConv2D
-        | SWATLinear
-        | SWATConv2D
-        | nn.Linear
-        | nn.Conv2d,
+        SWATLinear | SWATConv2D | nn.Linear | nn.Conv2d,
     ):
         # Your code here
         fan_in = calculate_fan_in(module.weight.data)
@@ -110,7 +105,7 @@ def init_weights(module: nn.Module) -> None:
         u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
         if isinstance(
             module,
-            PowerPropLinear | PowerPropConv2D | SWATLinear | SWATConv2D,
+            SWATLinear | SWATConv2D,
         ):
             u = torch.sign(u) * torch.pow(torch.abs(u), 1.0 / module.alpha)
 
@@ -139,39 +134,6 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
     fan_in = num_input_fmaps * receptive_field_size
 
     return float(fan_in)
-
-
-def replace_layer_with_powerprop(
-    module: nn.Module,
-    name: str = "Model",  # ? Never used. Give some problem
-    alpha: float = 2.0,
-) -> None:
-    """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
-    for attr_str in dir(module):
-        target_attr = getattr(module, attr_str)
-        if type(target_attr) == nn.Conv2d:
-            new_conv = PowerPropConv2D(
-                alpha=alpha,
-                in_channels=target_attr.in_channels,
-                out_channels=target_attr.out_channels,
-                kernel_size=target_attr.kernel_size[0],
-                bias=target_attr.bias is not None,
-                padding=target_attr.padding,
-                stride=target_attr.stride,
-            )
-            setattr(module, attr_str, new_conv)
-        if type(target_attr) == nn.Linear:
-            new_conv = PowerPropLinear(
-                alpha=alpha,
-                in_features=target_attr.in_features,
-                out_features=target_attr.out_features,
-                bias=target_attr.bias is not None,
-            )
-            setattr(module, attr_str, new_conv)
-
-    # ? for name, immediate_child_module in module.named_children(): # Previus version
-    for model, immediate_child_module in module.named_children():
-        replace_layer_with_powerprop(immediate_child_module, model, alpha)
 
 
 def replace_layer_with_swat(
@@ -212,89 +174,10 @@ def replace_layer_with_swat(
         replace_layer_with_swat(immediate_child_module, model, alpha, sparsity)
 
 
-def get_parameters_to_prune(
-    net: nn.Module,
-) -> Iterable[tuple[nn.Module, str, str]]:
-    """Pruning.
-
-    Return an iterable of tuples containing the PowerPropConv2D layers in the input
-    model.
-    """
-    parameters_to_prune = []
-
-    def add_immediate_child(
-        module: nn.Module,
-        name: str,
-    ) -> None:
-        if (
-            type(module) == PowerPropConv2D
-            or type(module) == PowerPropLinear
-            or type(module) == nn.Conv2d
-            or type(module) == nn.Linear
-            or type(module) == SWATConv2D
-            or type(module) == SWATLinear
-        ):
-            parameters_to_prune.append((module, "weight", name))
-
-        for _name, immediate_child_module in module.named_children():
-            add_immediate_child(immediate_child_module, _name)
-
-    add_immediate_child(net, "Net")
-
-    return parameters_to_prune
-
-
-# All experiments will have the exact same initialization.
-# All differences in performance will come from training
-def get_network_generator_cnn() -> Callable[[], Net]:
-    """Net network generatror."""
-    untrained_net: Net = Net()
-
-    def generated_net() -> Net:
-        return deepcopy(untrained_net)
-
-    return generated_net
-
-
-def get_network_generator_resnet() -> Callable[[], NetCifarResnet18]:
-    """Cifar Resnet18 network generatror."""
-    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
-
-    def generated_net() -> NetCifarResnet18:
-        return deepcopy(untrained_net)
-
-    return generated_net
-
-
-def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet18]:
-    """Powerprop Resnet generator."""
-    alpha: float = 4.0
-    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
-    replace_layer_with_powerprop(
-        module=untrained_net,
-        name="NetCifarResnet18",
-        alpha=alpha,
-    )
-
-    def init_model(
-        module: nn.Module,
-    ) -> None:
-        init_weights(module)
-        for _, immediate_child_module in module.named_children():
-            init_model(immediate_child_module)
-
-    init_model(untrained_net)
-
-    def generated_net(_config: dict) -> NetCifarResnet18:
-        return deepcopy(untrained_net)
-
-    return generated_net
-
-
 def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
-    alpha: float = 2
-    sparsity: float = 0.3
+    alpha: float = 4
+    sparsity: float = 0.7
 
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
 
