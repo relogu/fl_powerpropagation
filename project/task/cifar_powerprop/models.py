@@ -139,7 +139,7 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
 def replace_layer_with_powerprop(
     module: nn.Module,
     name: str = "Model",  # ? Never used. Give some problem
-    alpha: float = 2.0,
+    alpha: float = 4.0,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
     for attr_str in dir(module):

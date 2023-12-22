@@ -198,7 +198,7 @@ def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
 
     init_model(untrained_net)
 
-    def generated_net(_config: dict) -> NetCifarResnet18:
+    def generated_net(_config: dict | None) -> NetCifarResnet18:
         """Net generator."""
         return deepcopy(untrained_net)
 

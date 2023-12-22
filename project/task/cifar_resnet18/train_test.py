@@ -1,4 +1,4 @@
-"""MNIST training and testing functions, local and federated."""
+"""CIFAR training and testing functions, local and federated."""
 
 from collections.abc import Sized
 from pathlib import Path

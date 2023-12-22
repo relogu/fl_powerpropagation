@@ -1,10 +1,10 @@
 ---
 defaults:
   - _self_
-  - task: swat
+  - task: cifar_swat
   - fed: cifar
   - strategy: fedavg
-  - dataset: cifar
+  - dataset: cifar_iid
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory

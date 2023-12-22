@@ -1,19 +1,17 @@
-"""Dispatch the MNIST functionality to project.main.
+"""Dispatch the functionality of the task to project.main.
 
-The dispatch functions are used to
-dynamically select the correct functions from the task
+The dispatch functions are used to dynamically select
+the correct functions from the task
 based on the hydra config file.
-The following categories of functionality are grouped together:
+You need to write dispatch functions for three categories:
     - train/test and fed test functions
     - net generator and dataloader generator functions
     - fit/eval config functions
 
 The top-level project.dipatch module operates as a pipeline
 and selects the first function which does not return None.
-
-Do not throw any errors based on not finding a given attribute
-in the configs under any circumstances.
-
+Do not throw any errors based on not finding
+a given attribute in the configs under any circumstances.
 If you cannot match the config file,
 return None and the dispatch of the next task
 in the chain specified by project.dispatch will be used.
@@ -22,16 +20,11 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_powerprop.models import get_network_generator_resnet_powerprop
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
-from project.task.cifar_powerprop.dataset import (
-    get_dataloader_generators as new_generators,
-)
-from project.task.cifar_powerprop.dataset_old import (
-    get_dataloader_generators as old_generators,
-)
-from project.task.cifar_powerprop.train_test import get_fed_eval_fn, test, train
+from project.task.cifar_resnet18.dataset import get_dataloader_generators
+from project.task.cifar_resnet18.models import get_resnet18
+from project.task.cifar_resnet18.train_test import get_fed_eval_fn, train, test
 from project.types.common import DataStructure, TrainStructure
 
 
@@ -66,8 +59,12 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "CIFAR_NEW":
-        return train, test, get_fed_eval_fn
+    if train_structure is not None and train_structure.upper() == "RESNET18":
+        return (
+            train,
+            test,
+            get_fed_eval_fn,
+        )
 
     # Cannot match, send to next dispatch in chain
     return None
@@ -115,30 +112,17 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
     if client_model_and_data is not None and partition_dir is not None:
         # Obtain the dataloader generators
         # for the provided partition dir
+        (
+            client_dataloader_gen,
+            fed_dataloater_gen,
+        ) = get_dataloader_generators(
+            Path(partition_dir),
+        )
 
         # Case insensitive matches
-        if client_model_and_data.upper() == "POWERPROP_NEW":
-            (
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            ) = new_generators(
-                Path(partition_dir),
-            )
+        if client_model_and_data.upper() == "CIFAR_RESNET18":
             return (
-                get_network_generator_resnet_powerprop(),
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            )
-
-        if client_model_and_data.upper() == "POWERPROP_OLD":
-            (
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            ) = old_generators(
-                Path(partition_dir),
-            )
-            return (
-                get_network_generator_resnet_powerprop(),
+                get_resnet18(),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

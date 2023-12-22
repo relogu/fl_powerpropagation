@@ -434,7 +434,6 @@ def download_and_preprocess(cfg: DictConfig) -> None:
         subset_dict = {"data": subset_data, "targets": subset_targets}
         torch.save(subset_dict, client_dir / "train.pt")
 
-        # This also must be saved as a dictionary !?
         torch.save(ds_val, client_dir / "test.pt")
 
         # client_dataloader(partition_dir, idx, 64, False)
@@ -447,8 +446,6 @@ def client_dataloader(
     test: bool,
 ) -> DataLoader:
     """Return a DataLoader for a client's dataset.
-
-    This function is ment to be used as test for the saved dataset partition.
 
     Parameters
     ----------
@@ -485,7 +482,6 @@ def client_dataloader(
             ),
             target.to(device),
         )
-        break
 
     return dataset_loader
 

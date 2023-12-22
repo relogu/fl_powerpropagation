@@ -13,6 +13,7 @@ from project.task.default.dataset import (
 )
 from project.types.common import ClientDataloaderGen, FedDataloaderGen
 
+
 # Use defaults for this very simple dataset
 # Requires only batch size
 ClientDataloaderConfig = DefaultClientDataloaderConfig
@@ -63,13 +64,15 @@ def get_dataloader_generators(
         del _config
 
         client_dir = partition_dir / f"client_{cid}"
+
         if not test:
             dataset = torch.load(client_dir / "train.pt")
+            # dataset = list(zip(dataset['data'], dataset['targets']))
         else:
             dataset = torch.load(client_dir / "test.pt")
 
         dataset_loader = DataLoader(
-            list(zip(dataset["data"], dataset["targets"], strict=True)),
+            dataset,
             batch_size=config.batch_size,
             shuffle=not test,
         )

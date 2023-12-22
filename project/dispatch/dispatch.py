@@ -52,6 +52,13 @@ from project.task.cifar_swat.dispatch import (
     dispatch_train as dispatch_cifar_swat_train,
 )
 
+from project.task.cifar_resnet18.dispatch import (
+    dispatch_config as dispatch_resnet18_config,
+)
+from project.task.cifar_resnet18.dispatch import dispatch_data as dispatch_resnet18_data
+from project.task.cifar_resnet18.dispatch import (
+    dispatch_train as dispatch_resnet18_train,
+)
 
 from project.types.common import ConfigStructure, DataStructure, TrainStructure
 
@@ -81,6 +88,7 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
         dispatch_cifar_train,
         dispatch_cifar_powerprop_train,
         dispatch_cifar_swat_train,
+        dispatch_resnet18_train,
     ]
 
     # Match the first function which does not return None
@@ -121,6 +129,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure:
         dispatch_cifar_data,
         dispatch_cifar_powerprop_data,
         dispatch_cifar_swat_data,
+        dispatch_resnet18_data,
     ]
 
     # Match the first function which does not return None
@@ -161,6 +170,7 @@ def dispatch_config(cfg: DictConfig) -> ConfigStructure:
         dispatch_default_config,
         dispatch_cifar_powerprop_config,
         dispatch_cifar_swat_config,
+        dispatch_resnet18_config,
     ]
 
     # Match the first function which does not return None

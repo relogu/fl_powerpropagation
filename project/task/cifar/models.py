@@ -285,7 +285,7 @@ def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet1
 
     init_model(untrained_net)
 
-    def generated_net(_config: dict) -> NetCifarResnet18:
+    def generated_net(_config: dict | None) -> NetCifarResnet18:
         return deepcopy(untrained_net)
 
     return generated_net
