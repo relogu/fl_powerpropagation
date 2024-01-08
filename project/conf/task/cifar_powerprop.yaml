@@ -8,6 +8,8 @@ model_and_data: POWERPROP_NEW
 train_structure: CIFAR_NEW
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
+alpha: 2
+
 # Client fit config
 fit_config:
   # Net does not require any configuration

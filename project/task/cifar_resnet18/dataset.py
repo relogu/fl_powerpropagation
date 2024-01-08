@@ -70,7 +70,6 @@ def get_dataloader_generators(
 
         dataset_loader = DataLoader(
             list(zip(dataset["data"], dataset["targets"], strict=True)),
-            # dataset,
             batch_size=config.batch_size,
             shuffle=not test,
         )

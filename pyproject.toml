@@ -194,7 +194,8 @@ exclude = [
     "venv",
     "proto",
     "project/task/utils",
-    "project/fed/server/strategy/fedavg_custom.py"
+    "project/fed/server/strategy/fedavg_custom.py",
+    "project/task/cifar_resnet18/common.py"
 ]
 
 [tool.ruff.format]

@@ -117,10 +117,13 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             Path(partition_dir),
         )
 
+        alpha: float = cfg.get("task", {}).get("alpha", 4)
+        sparsity: float = cfg.get("task", {}).get("sparsity", 0.7)
+
         # Case insensitive matches
         if client_model_and_data.upper() == "SWAT_RESNET":
             return (
-                get_network_generator_resnet_swat(),
+                get_network_generator_resnet_swat(alpha=alpha, sparsity=sparsity),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

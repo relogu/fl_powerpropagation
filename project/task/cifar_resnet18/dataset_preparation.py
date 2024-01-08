@@ -1,4 +1,4 @@
-"""Functions for MNIST download and processing."""
+"""Functions for CIFAR download and processing."""
 
 import logging
 from collections.abc import Sequence, Sized
@@ -7,6 +7,7 @@ from typing import cast
 
 import hydra
 import numpy as np
+from sklearn.model_selection import train_test_split
 import torch
 from flwr.common.logger import log
 from omegaconf import DictConfig, OmegaConf
@@ -15,6 +16,9 @@ from torchvision import transforms
 from torchvision.datasets import CIFAR10
 
 from project.utils.utils import obtain_device
+from project.task.cifar_resnet18.common import create_lda_partitions
+
+HYDRA_FULL_ERROR = 1
 
 
 def _download_data(
@@ -56,6 +60,7 @@ def _partition_data(
     seed: int,
     iid: bool,
     power_law: bool,
+    lda: bool,
     balance: bool,
 ) -> tuple[list[Subset] | list[ConcatDataset], CIFAR10]:
     """Split training set into iid or non iid partitions to simulate the federated.
@@ -110,6 +115,18 @@ def _partition_data(
             mean=0.0,
             sigma=2.0,
         )
+    elif lda:
+        x = torch.from_numpy(np.array([sample[0] for sample in trainset]))
+        y = torch.from_numpy(np.array([sample[1] for sample in trainset]))
+
+        # Pack into a tuple
+        xy = (x, y)
+        datasets, _ = create_lda_partitions(
+            dataset=xy,
+            num_partitions=num_clients,
+            concentration=0.1,
+        )
+
     else:
         shard_size = int(partition_size / 2)
         idxs = trainset.targets.argsort()
@@ -361,7 +378,7 @@ def _power_law_split(
 
 @hydra.main(
     config_path="../../conf",
-    config_name="cifar_iid",
+    config_name="cifar_lda",
     version_base=None,
 )
 def download_and_preprocess(cfg: DictConfig) -> None:
@@ -396,6 +413,7 @@ def download_and_preprocess(cfg: DictConfig) -> None:
         cfg.dataset.seed,
         cfg.dataset.iid,
         cfg.dataset.power_law,
+        cfg.dataset.lda,
         cfg.dataset.balance,
     )
 
@@ -409,36 +427,60 @@ def download_and_preprocess(cfg: DictConfig) -> None:
     # but is not used here
     torch.save(fed_test_set, partition_dir / "test.pt")
 
-    # Save the client datasets
-    for idx, client_dataset in enumerate(client_datasets):
-        log(logging.INFO, len(client_dataset))
-        client_dir = partition_dir / f"client_{idx}"
-        client_dir.mkdir(parents=True, exist_ok=True)
+    if cfg.dataset.lda:
 
-        len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
-        lengths = [len(client_dataset) - len_val, len_val]
-        ds_train, ds_val = random_split(
-            client_dataset,
-            lengths,
-            torch.Generator().manual_seed(cfg.dataset.seed),
-        )
+        for idx, client_dataset in enumerate(client_datasets):
+            log(logging.INFO, len(client_dataset[0]))
+            client_dir = partition_dir / f"client_{idx}"
+            client_dir.mkdir(parents=True, exist_ok=True)
 
-        # Get indices of the subset
-        subset_indices = ds_train.indices
+            len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
+            lengths = [len(client_dataset) - len_val, len_val]
+            x_train, x_test, y_train, y_test = train_test_split(
+                client_dataset[0], client_dataset[1], test_size=0.1
+            )
 
-        # Access the necessary subset tensors
-        subset_data = torch.stack([client_dataset[i][0] for i in subset_indices])
-        subset_targets = torch.tensor([client_dataset[i][1] for i in subset_indices])
+            # subset_dict = {"data": client_dataset[0], "targets": client_dataset[1]}
+            subset_dict = {"data": x_train, "targets": y_train}
+            torch.save(subset_dict, client_dir / "train.pt")
 
-        # Save the subset tensors in a dictionary format
-        subset_dict = {"data": subset_data, "targets": subset_targets}
-        torch.save(subset_dict, client_dir / "train.pt")
+            subset_dict = {"data": x_test, "targets": y_test}
+            torch.save(subset_dict, client_dir / "test.pt")
+            # torch.save(client_dataset[1], client_dir / "test.pt")
 
-        torch.save(ds_val, client_dir / "test.pt")
+            client_dataloader(partition_dir, idx, 64, False)
+    else:
+        # Save the client datasets
+        for idx, client_dataset in enumerate(client_datasets):
+            log(logging.INFO, len(client_dataset))
+            client_dir = partition_dir / f"client_{idx}"
+            client_dir.mkdir(parents=True, exist_ok=True)
 
-        # client_dataloader(partition_dir, idx, 64, False)
+            len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
+            lengths = [len(client_dataset) - len_val, len_val]
+            ds_train, ds_val = random_split(
+                client_dataset,
+                lengths,
+                torch.Generator().manual_seed(cfg.dataset.seed),
+            )
+
+            # Get indices of the subset
+            subset_indices = ds_train.indices
+            subset_data = torch.stack([
+                torch.from_numpy(client_dataset[i][0]) for i in subset_indices
+            ])
+            subset_targets = torch.tensor([
+                client_dataset[i][1] for i in subset_indices
+            ])
+            # Save the subset tensors in a dictionary format
+            subset_dict = {"data": subset_data, "targets": subset_targets}
+            torch.save(subset_dict, client_dir / "train.pt")
+            torch.save(ds_val, client_dir / "test.pt")
+
+            # client_dataloader(partition_dir, idx, 64, False)
 
 
+# TEST
 def client_dataloader(
     partition_dir: Path,
     cid: str | int,
@@ -467,7 +509,7 @@ def client_dataloader(
     else:
         dataset = torch.load(client_dir / "test.pt")
 
-    dataset_loader = DataLoader(
+    dataset = DataLoader(
         list(zip(dataset["data"], dataset["targets"], strict=True)),
         batch_size=batch_size,
         shuffle=not test,
@@ -475,15 +517,17 @@ def client_dataloader(
 
     device = obtain_device()
     # for data, target in list(zip(dataset['data'], dataset['targets'])):
-    for data, target in dataset_loader:
+    # print(dataset['data'].shape)
+    for data, target in dataset:
         data, target = (
             data.to(
                 device,
             ),
             target.to(device),
         )
+        break
 
-    return dataset_loader
+    return dataset
 
 
 if __name__ == "__main__":
