@@ -30,12 +30,12 @@ save_frequency: 1
 to_clean_once: [history, parameters, yaml, log]
 
 # Control wandb logging
-use_wandb: false
+use_wandb: true
 
 # Test without Ray to enable easy error detection
 test_clients:
   all: false
-  one: false
+  one: true
 
 # Wandb configuration
 # add whatever tags you like
@@ -46,6 +46,7 @@ wandb:
     tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
     entity: null
     mode: online
+    name: swat
 
 # For Ray cluster usage
 # leave null unless you need 

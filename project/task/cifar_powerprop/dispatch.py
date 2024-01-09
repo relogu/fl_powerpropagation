@@ -124,21 +124,23 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             ) = new_generators(
                 Path(partition_dir),
             )
+            alpha = cfg.get("task", {}).get("alpha", 4.0)
             return (
-                get_network_generator_resnet_powerprop(),
+                get_network_generator_resnet_powerprop(alpha=alpha),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )
 
-        if client_model_and_data.upper() == "POWERPROP_OLD":
+        elif client_model_and_data.upper() == "POWERPROP_OLD":
             (
                 client_dataloader_gen,
                 fed_dataloater_gen,
             ) = old_generators(
                 Path(partition_dir),
             )
+            alpha = cfg.get("task", {}).get("alpha", 4.0)
             return (
-                get_network_generator_resnet_powerprop(),
+                get_network_generator_resnet_powerprop(alpha=alpha),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )
