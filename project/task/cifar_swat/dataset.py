@@ -1,8 +1,6 @@
 """MNIST dataset utilities for federated learning."""
 
 from pathlib import Path
-import random
-import numpy as np
 
 import torch
 from torch.utils.data import DataLoader
@@ -70,23 +68,13 @@ def get_dataloader_generators(
         else:
             dataset = torch.load(client_dir / "test.pt")
 
-        # to be removed?
-        def seed_worker() -> None:
-            """Seed a worker's random number generators."""
-            worker_seed = torch.initial_seed() % 42
-            np.random.seed(worker_seed)
-            random.seed(worker_seed)
-
-        g = torch.Generator()
-        g.manual_seed(int(cid))
-
-        return DataLoader(
-            dataset,
+        dataset_loader = DataLoader(
+            list(zip(dataset["data"], dataset["targets"], strict=True)),
             batch_size=config.batch_size,
             shuffle=not test,
-            worker_init_fn=seed_worker,
-            generator=g,
         )
+
+        return dataset_loader
 
     def get_federated_dataloader(
         test: bool,

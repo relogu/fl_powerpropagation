@@ -114,6 +114,7 @@ class WandbServer(Server):
 
         for current_round in range(1, num_rounds + 1):
             # Train model and replace previous global model
+            # prendere un timer sulla fit
             res_fit = self.fit_round(
                 server_round=current_round,
                 timeout=timeout,
@@ -150,6 +151,7 @@ class WandbServer(Server):
                     server_round=current_round,
                     loss=loss_cen,
                 )
+                # mettere la metrica qui dentro centralized / round complition time
                 history.add_metrics_centralized(
                     server_round=current_round,
                     metrics=metrics_cen,
