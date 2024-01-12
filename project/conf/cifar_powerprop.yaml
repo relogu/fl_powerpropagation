@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: cifar_powerprop
   - fed: cifar
-  - strategy: fedavg
+  - strategy: fedavg_custom
   - dataset: cifar_iid
 
 # If running the same experiment multiple times
