@@ -1,4 +1,6 @@
 ---
+name: cifar_iid
+
 # Where to store data
 dataset_dir: ./data/cifar/data
 
