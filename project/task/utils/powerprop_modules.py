@@ -44,7 +44,7 @@ class PowerPropLinear(nn.Module):
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
-        weight = self.weight  # * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
+        weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         # Apply a mask, if given
         if mask is not None:
             weight *= mask
@@ -96,7 +96,7 @@ class PowerPropConv2D(nn.Module):
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
-        weight = self.weight  # * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
+        weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         # Apply a mask, if given
         if mask is not None:
             weight *= mask

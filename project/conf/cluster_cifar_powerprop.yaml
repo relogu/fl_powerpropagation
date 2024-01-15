@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: cifar_powerprop
   - fed: cifar
-  - strategy: fedavg
+  - strategy: fedavg_custom
   - dataset: cluster_cifar_iid
 
 # If running the same experiment multiple times
@@ -51,7 +51,7 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: powerprop01-mod
+    name: powerprop02-fedavgC
 
 # For Ray cluster usage
 # leave null unless you need 
