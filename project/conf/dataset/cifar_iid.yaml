@@ -10,7 +10,7 @@ dataset_dir: ./data/cifar/data
 partition_dir: ./data/cifar/iid
 
 # How many clients to create
-num_clients: 20
+num_clients: 100
 
 # How large should the test set of each client
 # be relative to the train set
@@ -25,7 +25,9 @@ iid: true
 
 # If the partition labels should follow a power law
 # distribution
-power_law: true
+power_law: false
+
+lda: false
 
 # If the partition labels should be balanced
 balance: false

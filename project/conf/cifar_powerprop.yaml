@@ -3,8 +3,8 @@ defaults:
   - _self_
   - task: cifar_powerprop
   - fed: cifar
-  - strategy: fedavg_custom
-  - dataset: cifar_iid
+  - strategy: fedavg
+  - dataset: cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -30,7 +30,7 @@ save_frequency: 1
 to_clean_once: [history, parameters, yaml, log]
 
 # Control wandb logging
-use_wandb: false
+use_wandb: true
 
 # Test without Ray to to enable easy error detection
 test_clients:
@@ -42,10 +42,16 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: template
-    tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
+    project: powerprop_alpha
+    tags:
+      - strategy_${strategy.name}
+      - seed_${fed.seed}
+      - powerprop
+      - alpha_${task.alpha}
+      - patitioning_${dataset.name}
     entity: null
     mode: online
+    name: powerprop-02
 
 # For Ray cluster usage
 # leave null unless you need 

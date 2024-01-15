@@ -18,6 +18,7 @@ Paper: arxiv.org/abs/1602.05629
 """
 
 
+from ast import Dict
 from logging import WARNING
 from typing import Optional, Union
 from collections.abc import Callable
@@ -202,7 +203,7 @@ class FedAvgC(Strategy):
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
 
-    def evaluate(
+    '''def evaluate(
         self, server_round: int, parameters: Parameters
     ) -> Optional[tuple[float, dict[str, Scalar]]]:
         """Evaluate model parameters using an evaluation function."""
@@ -215,7 +216,7 @@ class FedAvgC(Strategy):
             return None
 
         loss, metrics = eval_res
-        return loss, metrics
+        return loss, metrics'''
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager

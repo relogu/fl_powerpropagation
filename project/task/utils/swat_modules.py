@@ -153,11 +153,15 @@ class swat_conv2d_unstructured(Function):
             groups=groups,
         )
 
-        if in_threshold < 0.0:
-            sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, 1 - sparsity)
-            in_threshold = in_threshold_tensor.item()
-        else:
-            sparse_input = drop_threshold(input, in_threshold)
+        # remove the threshold check. Calaulate the threshold in the forward pass evry time. !!??
+        # if in_threshold < 0.0:
+        #     sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, 1 - sparsity)
+        #     in_threshold = in_threshold_tensor.item()
+        # else:
+        #     sparse_input = drop_threshold(input, in_threshold)
+
+        sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, 1 - sparsity)
+        in_threshold = in_threshold_tensor.item()
 
         # print(f"[swat_conv2d_unstructured.forward] weight: {nonzeros_rate(weight)}")
         # print(f"[swat_conv2d_unstructured.forward] input: {nonzeros_rate(input)} sparse_input: {nonzeros_rate(sparse_input)}")
@@ -207,10 +211,14 @@ class swat_conv2d_structured_channel(Function):
             dilation=dilation,
             groups=groups,
         )
-        if in_threshold is None:
-            input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity.item())
-        else:
-            input = drop_threshold(input, in_threshold.item())
+
+        # if in_threshold is None:
+        #     input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity.item())
+        # else:
+        #     input = drop_threshold(input, in_threshold.item())
+
+        input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity.item())
+
         ctx.save_for_backward(input, weight, bias)
         ctx.conf = {
             "stride": stride,

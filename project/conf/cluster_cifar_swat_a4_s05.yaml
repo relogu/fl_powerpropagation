@@ -1,7 +1,7 @@
 ---
 defaults:
   - _self_
-  - task: cifar_resnet18
+  - task: cifar_swat_a4_s05
   - fed: cifar
   - strategy: fedavg
   - dataset: cluster_cifar_iid
@@ -19,7 +19,7 @@ working_dir: null
 # at the end of training
 to_save_once: [history, yaml, log]
 
-# List of file patterns to be saved from working_dir repeteadly
+# List of file patterns to be saved repeteadly
 to_save_per_round: [parameters]
 
 # The frequency with which they should be saved
@@ -32,7 +32,7 @@ to_clean_once: [history, parameters, yaml, log]
 # Control wandb logging
 use_wandb: true
 
-# Test without Ray to to enable easy error detection
+# Test without Ray to enable easy error detection
 test_clients:
   all: false
   one: true
@@ -42,11 +42,11 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: lda-cifar
-    tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
+    project: swat
+    tags: ['strategy_${strategy.name}', 'seed_${fed.seed}', swat]
     entity: null
     mode: online
-    name: resnet18-iid2
+    name: swat_a4_s05
 
 # For Ray cluster usage
 # leave null unless you need 
