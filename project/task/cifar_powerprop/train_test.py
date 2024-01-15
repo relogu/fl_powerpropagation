@@ -1,12 +1,21 @@
 """MNIST training and testing functions, local and federated."""
 
-from collections.abc import Sized
+from collections.abc import Callable, Sized
 from pathlib import Path
 from typing import cast
+
+import logging
+from logging import ERROR
+from flwr.common import log
+from project.task.cifar.models import (
+    get_parameters_to_prune,
+)
+
 
 import torch
 from pydantic import BaseModel
 from torch import nn
+from torch.nn.utils import prune
 from torch.utils.data import DataLoader
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
@@ -105,6 +114,54 @@ def train(  # pylint: disable=too-many-arguments
         ),
         "train_accuracy": float(num_correct) / len(cast(Sized, trainloader.dataset)),
     }
+
+
+def get_train_and_prune(
+    amount: float = 0.3, pruning_method: str = "base"
+) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
+    """Return the training loop with one step pruning at the end.
+
+    Think about moving 'amount' to the config file
+    """
+    if pruning_method == "base":  # ? not working
+        pruning_method = prune.BasePruningMethod
+    elif pruning_method == "l1":
+        pruning_method = prune.L1Unstructured
+    else:
+        log(ERROR, f"Pruning method {pruning_method} not recognised, using base")
+
+    def train_and_prune(
+        net: nn.Module,
+        trainloader: DataLoader,
+        _config: dict,
+        _working_dir: Path,
+    ) -> tuple[int, dict]:
+        """Training and pruning process."""
+        log(logging.DEBUG, "Start training")
+
+        parameters_to_prune = get_parameters_to_prune(net)
+
+        metrics = train(
+            net=net,
+            trainloader=trainloader,
+            _config=_config,
+            _working_dir=_working_dir,
+        )
+
+        prune.global_unstructured(
+            parameters=[
+                (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+            ],
+            pruning_method=pruning_method,
+            amount=amount,
+        )
+
+        for module, name, _ in parameters_to_prune:
+            prune.remove(module, name)
+
+        return metrics
+
+    return train_and_prune
 
 
 class TestConfig(BaseModel):

@@ -31,7 +31,12 @@ from project.task.cifar_powerprop.dataset import (
 from project.task.cifar_powerprop.dataset_old import (
     get_dataloader_generators as old_generators,
 )
-from project.task.cifar_powerprop.train_test import get_fed_eval_fn, test, train
+from project.task.cifar_powerprop.train_test import (
+    get_fed_eval_fn,
+    get_train_and_prune,
+    test,
+    train,
+)
 from project.types.common import DataStructure, TrainStructure
 
 
@@ -68,7 +73,13 @@ def dispatch_train(
     # Only consider not None and uppercase matches
     if train_structure is not None and train_structure.upper() == "CIFAR_NEW":
         return train, test, get_fed_eval_fn
-
+    elif train_structure is not None and train_structure.upper() == "CIFAR_PRUNE":
+        sparsity = cfg.get("task", {}).get("sparsity", 0.5)
+        return (
+            get_train_and_prune(amount=sparsity, pruning_method="l1"),
+            test,
+            get_fed_eval_fn,
+        )
     # Cannot match, send to next dispatch in chain
     return None
 
