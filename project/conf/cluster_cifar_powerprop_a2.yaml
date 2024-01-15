@@ -1,7 +1,7 @@
 ---
 defaults:
   - _self_
-  - task: cifar_resnet18
+  - task: cifar_powerprop_a2
   - fed: cifar
   - strategy: fedavg
   - dataset: cluster_cifar_iid
@@ -42,11 +42,16 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: lda-cifar
-    tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
+    project: powerprop_alpha
+    tags:
+      - strategy_${strategy.name}
+      - seed_${fed.seed}
+      - powerprop
+      - alpha_${task.alpha}
+      - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: resnet18-iid2
+    name: powerprop_a2
 
 # For Ray cluster usage
 # leave null unless you need 

@@ -55,7 +55,7 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 """
 
 
-def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def old_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -73,7 +73,7 @@ def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     return weights_prime
 
 
-def nop_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average for non-zero weights."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -203,7 +203,7 @@ class FedAvgC(Strategy):
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
 
-    def evaluate(
+    '''def evaluate(
         self, server_round: int, parameters: Parameters
     ) -> Optional[tuple[float, dict[str, Scalar]]]:
         """Evaluate model parameters using an evaluation function."""
@@ -216,7 +216,7 @@ class FedAvgC(Strategy):
             return None
 
         loss, metrics = eval_res
-        return loss, metrics
+        return loss, metrics'''
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager

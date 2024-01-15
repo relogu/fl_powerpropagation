@@ -378,7 +378,7 @@ def _power_law_split(
 
 @hydra.main(
     config_path="../../conf",
-    config_name="cluster_cifar_resnet18",
+    config_name="cifar_resnet18",
     version_base=None,
 )
 def download_and_preprocess(cfg: DictConfig) -> None:

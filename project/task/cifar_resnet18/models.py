@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from collections.abc import Callable
+import numpy as np
 
 import torch
 import torch.nn.functional as F
@@ -81,11 +82,69 @@ class NetCifarResnet18(nn.Module):
 # get_resnet18: NetGen = lazy_config_wrapper(NetCifarResnet18)
 
 
+def init_weights(module: nn.Module) -> None:
+    """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
+    if isinstance(
+        module,
+        nn.Linear | nn.Conv2d,
+    ):
+        # Your code here
+        fan_in = calculate_fan_in(module.weight.data)
+
+        # constant from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
+        distribution_stddev = 0.87962566103423978
+
+        std = np.sqrt(1.0 / fan_in) / distribution_stddev
+        a, b = -2.0 * std, 2.0 * std
+
+        u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
+        """' if isinstance( module,
+
+        PowerPropLinear | PowerPropConv2D, ):     u = torch.sign(u) *
+        torch.pow(torch.abs(u), 1.0 / module.alpha)
+        """
+
+        module.weight.data = u
+        if module.bias is not None:
+            module.bias.data.zero_()
+
+
+def calculate_fan_in(tensor: torch.Tensor) -> float:
+    """Calculate fan in.
+
+    Modified from: https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py
+    """
+    min_fan_in = 2
+    dimensions = tensor.dim()
+    if dimensions < min_fan_in:
+        raise ValueError(
+            "Fan in can not be computed for tensor with fewer than 2 dimensions"
+        )
+
+    num_input_fmaps = tensor.size(1)
+    receptive_field_size = 1
+    if dimensions > min_fan_in:
+        for s in tensor.shape[2:]:
+            receptive_field_size *= s
+    fan_in = num_input_fmaps * receptive_field_size
+
+    return float(fan_in)
+
+
 def get_resnet18() -> Callable[[dict], NetCifarResnet18]:
     """Cifar Resnet18 network generatror."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
 
     def generated_net(_config: dict) -> NetCifarResnet18:
         return deepcopy(untrained_net)
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
 
     return generated_net
