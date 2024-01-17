@@ -4,9 +4,11 @@ Make sure the model and dataset are not loaded before the fit function.
 """
 
 from pathlib import Path
+import pickle
 
 import flwr as fl
 from flwr.common import NDArrays
+import numpy as np
 from pydantic import BaseModel
 from torch import nn
 
@@ -119,6 +121,36 @@ class Client(fl.client.NumPyClient):
 
         config.run_config["device"] = obtain_device()
 
+        # Check, from the config, if the mask has to be used
+        if config.extra["mask"]:
+            # mask_path = self.working_dir / f"mask_{self.cid}.npy"
+            mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+            if mask_path.exists():
+                # mask = np.load(mask_path)
+                with open(mask_path, "rb") as f:
+                    mask = pickle.load(f)
+                # print(f"[clien_{self.cid}] Used Mask, saved in: ", mask_path)
+                # print the number of non zero elements in the mask
+                # print(f"[clien_{self.cid}] Number of non zero elements in the mask: ",
+                #    np.count_nonzero(mask))
+            else:
+                # print(f"[clien_{self.cid}] Creating new mask")
+                # Else create new mask for each layer's parameters
+                # mask = [np.random.rand(*param.shape) < 0.5 for param in parameters]
+                # Create a binary mask that map the non zero elements of the parameters
+                mask = [param != 0 for param in parameters]
+                # mask = [m.astype(int) for m in mask]
+            # Create noise, random sampling (1 - mask), for each layer's parameters
+            noise = [
+                np.random.normal(0, 0.1, param.shape) * (1 - m)
+                for param, m in zip(parameters, mask, strict=True)
+            ]
+            # Apply the mask and the noise to the parameters
+            parameters = [
+                param * m * n
+                for param, m, n in zip(parameters, mask, noise, strict=True)
+            ]
+
         self.net = self.set_parameters(
             parameters,
             config.net_config,
@@ -129,6 +161,7 @@ class Client(fl.client.NumPyClient):
             False,
             config.dataloader_config,
         )
+
         num_samples, metrics = self.train(
             self.net,
             trainloader,
@@ -136,8 +169,21 @@ class Client(fl.client.NumPyClient):
             self.working_dir,
         )
 
+        trained_parameters = generic_get_parameters(self.net)
+
+        # Check if the mask has been used
+        if config.extra["mask"]:
+            # Estract the mask from the parameters
+            # mask = trained_parameters != 0
+            mask = [param != 0 for param in parameters]
+            # Save the mask in the output dir
+            mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+            with open(mask_path, "wb") as f:
+                pickle.dump(mask, f)
+            # print(f"[clien_{self.cid}] Saving mask in: ", mask_path)
+
         return (
-            generic_get_parameters(self.net),
+            trained_parameters,
             num_samples,
             metrics,
         )

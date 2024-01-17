@@ -8,13 +8,14 @@ import torch
 from pydantic import BaseModel
 from torch import nn
 from torch.utils.data import DataLoader
+from project.client.client import ClientConfig
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
 from project.task.default.train_test import (
     get_on_evaluate_config_fn as get_default_on_evaluate_config_fn,
 )
-from project.task.default.train_test import (
-    get_on_fit_config_fn as get_default_on_fit_config_fn,
+from project.types.common import (
+    OnFitConfigFN,
 )
 
 
@@ -75,7 +76,7 @@ def train(  # pylint: disable=too-many-arguments
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.001,
+        weight_decay=0.001,  # 0.0005
     )
 
     final_epoch_per_sample_loss = 0.0
@@ -186,8 +187,45 @@ def test(
     )
 
 
-# Use defaults as they are completely determined
-# by the other functions defined in mnist_classification
+def get_on_fit_config_fn(fit_config: dict) -> OnFitConfigFN:
+    """Generate on_fit_config_fn based on a dict from the hydra config,.
+
+    Parameters
+    ----------
+    fit_config : Dict
+        The configuration for the fit function.
+        Loaded dynamically from the config file.
+
+    Returns
+    -------
+    Optional[OnFitConfigFN]
+        The on_fit_config_fn for the server if the fit_config is not empty, else None.
+    """
+    # Fail early if the fit_config does not match expectations
+    ClientConfig(**fit_config)
+
+    def fit_config_fn(server_round: int) -> dict:
+        """CIFAR on_fit_config_fn.
+
+        Parameters
+        ----------
+        server_round : int
+            The current server round.
+            Passed to the client
+
+        Returns
+        -------
+        Dict
+            The configuration for the fit function.
+            Loaded dynamically from the config file.
+        """
+        # resolve and convert to python dict
+        fit_config["extra"]["curr_round"] = server_round  # add round info
+        return fit_config
+
+    return fit_config_fn
+
+
 get_fed_eval_fn = get_default_fed_eval_fn
-get_on_fit_config_fn = get_default_on_fit_config_fn
+# get_on_fit_config_fn = get_default_on_fit_config_fn
 get_on_evaluate_config_fn = get_default_on_evaluate_config_fn

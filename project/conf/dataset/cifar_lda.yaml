@@ -7,10 +7,10 @@ dataset_dir: ./data/cifar/data
 # Folder of client folders
 # indexed by id, containing train and test
 # data in .pt format
-partition_dir: ./data/cifar/lda
+partition_dir: ./data/cifar/lda_${dataset.lda_alpha}
 
 # How many clients to create
-num_clients: 20
+num_clients: 100
 
 # How large should the test set of each client
 # be relative to the train set
@@ -28,6 +28,7 @@ iid: false
 power_law: false
 
 lda: true
+lda_alpha: 1.0
 
 # If the partition labels should be balanced
 balance: false

@@ -45,8 +45,8 @@ wandb:
     project: swat
     tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
     entity: null
-    mode: online
-    name: swat-a4-s0.5_treshold_lda
+    mode: offline
+    name: swat-a4-s0.5_fedc
 
 # For Ray cluster usage
 # leave null unless you need 
