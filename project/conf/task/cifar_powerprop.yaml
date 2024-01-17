@@ -8,7 +8,7 @@ model_and_data: POWERPROP_NEW
 train_structure: CIFAR_NEW
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
-alpha: 2
+alpha: 1.5
 
 # Client fit config
 fit_config:
@@ -16,7 +16,7 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 250
+    batch_size: 170
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 5

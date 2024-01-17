@@ -55,7 +55,7 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 """
 
 
-def old_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def original_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -73,7 +73,7 @@ def old_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     return weights_prime
 
 
-def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def old_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average for non-zero weights."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -93,6 +93,29 @@ def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
             num_examples_total,
             where=(num_examples_total > 0),
         )  # Modify this line
+        for layer_updates in zip(*weighted_weights)
+    ]
+    return weights_prime
+
+
+def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+    """Compute weighted average for non-zero weights."""
+    # Calculate the total number of examples used during training
+    num_examples_total = sum([num_examples for _, num_examples in results])
+
+    # Create a list of weights, each multiplied by the related number of examples
+    weighted_weights = [
+        [(layer * num_examples, layer != 0) for layer in weights]  # Modify this line
+        for weights, num_examples in results
+    ]
+
+    # Compute average weights of each layer
+    weights_prime: NDArrays = [
+        np.divide(
+            np.sum([mask * layer for layer, mask in layer_updates], axis=0),
+            num_examples_total,
+            where=(num_examples_total > 0),
+        )
         for layer_updates in zip(*weighted_weights)
     ]
     return weights_prime
@@ -203,7 +226,7 @@ class FedAvgC(Strategy):
         self.initial_parameters = None  # Don't keep initial parameters in memory
         return initial_parameters
 
-    '''def evaluate(
+    def evaluate(
         self, server_round: int, parameters: Parameters
     ) -> Optional[tuple[float, dict[str, Scalar]]]:
         """Evaluate model parameters using an evaluation function."""
@@ -216,7 +239,7 @@ class FedAvgC(Strategy):
             return None
 
         loss, metrics = eval_res
-        return loss, metrics'''
+        return loss, metrics
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager

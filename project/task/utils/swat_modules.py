@@ -212,13 +212,10 @@ class swat_conv2d_structured_channel(Function):
             groups=groups,
         )
 
-        # if in_threshold is None:
-        #     input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity.item())
-        # else:
-        #     input = drop_threshold(input, in_threshold.item())
-
-        input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity.item())
-
+        if in_threshold < 0:
+            input, in_threshold = drop_nhwc_send_th(input, 1 - sparsity.item())
+        else:
+            input = drop_threshold(input, in_threshold.item())
         ctx.save_for_backward(input, weight, bias)
         ctx.conf = {
             "stride": stride,
@@ -346,7 +343,7 @@ class SWATConv2D(nn.Module):
         groups: _int = 1,
         bias: bool = False,
         sparsity: float = 0.3,
-        pruning_type: str = "unstructured",
+        pruning_type: str = "unstructured",  # ????
         warm_up: int = 0,
         period: int = 1,
     ):

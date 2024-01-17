@@ -4,7 +4,7 @@ defaults:
   - task: cifar_swat
   - fed: cifar
   - strategy: fedavg_custom
-  - dataset: cluster_cifar_iid
+  - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -52,7 +52,7 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: swat05-fedavgC2
+    name: swat_a4_s0.7-lda-ep1-fedc-lr0.05
 
 # For Ray cluster usage
 # leave null unless you need 

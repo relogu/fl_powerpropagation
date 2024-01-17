@@ -6,8 +6,8 @@ model_and_data: SWAT_RESNET
 # Choose the train, test and server fed_eval functions
 train_structure: SWAT
 
-alpha: 4
-sparsity: 0.5
+alpha: 2
+sparsity: 0.7
 
 # Client fit config
 fit_config:
@@ -15,7 +15,7 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 125
+    batch_size: 100
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 5

@@ -1,10 +1,10 @@
 ---
 defaults:
   - _self_
-  - task: cifar_powerprop_a2
+  - task: cifar_powerprop_pruning
   - fed: cifar
-  - strategy: fedavg
-  - dataset: cluster_cifar_iid
+  - strategy: fedavg_custom
+  - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -42,7 +42,7 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: cross_silos
+    project: powerprop_alpha
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
@@ -51,7 +51,7 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: powerprop_a2-iid
+    name: powerprop_a2_s0.7-lda
 
 # For Ray cluster usage
 # leave null unless you need 

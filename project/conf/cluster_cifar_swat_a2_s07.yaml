@@ -1,10 +1,10 @@
 ---
 defaults:
   - _self_
-  - task: cifar_swat_a4_s09
+  - task: cifar_swat_a2_s07
   - fed: cifar
   - strategy: fedavg
-  - dataset: cluster_cifar_iid
+  - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -43,10 +43,16 @@ test_clients:
 wandb:
   setup:
     project: swat
-    tags: ['strategy_${strategy.name}', 'seed_${fed.seed}', swat]
+    tags:
+      - strategy_${strategy.name}
+      - seed_${fed.seed}
+      - swat
+      - alpha_${task.alpha}
+      - sparsity_${task.sparsity}
+      - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: swat_a4_s01
+    name: swat_a2_s07-lda
 
 # For Ray cluster usage
 # leave null unless you need 
