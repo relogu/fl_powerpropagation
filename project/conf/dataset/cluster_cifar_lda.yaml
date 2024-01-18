@@ -1,5 +1,5 @@
 ---
-name: cifar_lda
+name: cifar_lda${dataset.lda_alpha}
 
 # Where to store data
 dataset_dir: /datasets/CIFAR10
@@ -7,7 +7,8 @@ dataset_dir: /datasets/CIFAR10
 # Folder of client folders
 # indexed by id, containing train and test
 # data in .pt format
-partition_dir: /datasets/CIFAR10/lda-01
+# partition_dir: /datasets/CIFAR10/lda-01
+partition_dir: /datasets/CIFAR10/lda_${dataset.lda_alpha}
 
 # How many clients to create
 num_clients: 100
@@ -29,6 +30,7 @@ power_law: false
 
 # If the partition labels should follow a lda distribution
 lda: true
+lda_alpha: 1.0
 
 # If the partition labels should be balanced
 balance: false

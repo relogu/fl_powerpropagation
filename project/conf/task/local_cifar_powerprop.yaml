@@ -19,10 +19,10 @@ fit_config:
     batch_size: 250
   # The train function requires epochs and learning_rate
   run_config:
-    epochs: 5
+    epochs: 2
     learning_rate: 0.03
   # No extra config
-  extra: {}
+  extra: {mask: false}
 
 # Client eval config
 eval_config:
@@ -32,7 +32,7 @@ eval_config:
     batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {}
+  extra: {mask: false}
 
 # Configuration for the federated testing function
 # Follows the same conventions as the client config

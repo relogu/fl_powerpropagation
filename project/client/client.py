@@ -133,23 +133,23 @@ class Client(fl.client.NumPyClient):
                 # print the number of non zero elements in the mask
                 # print(f"[clien_{self.cid}] Number of non zero elements in the mask: ",
                 #    np.count_nonzero(mask))
-            else:
-                # print(f"[clien_{self.cid}] Creating new mask")
-                # Else create new mask for each layer's parameters
-                # mask = [np.random.rand(*param.shape) < 0.5 for param in parameters]
-                # Create a binary mask that map the non zero elements of the parameters
-                mask = [param != 0 for param in parameters]
-                # mask = [m.astype(int) for m in mask]
-            # Create noise, random sampling (1 - mask), for each layer's parameters
-            noise = [
-                np.random.normal(0, 0.1, param.shape) * (1 - m)
-                for param, m in zip(parameters, mask, strict=True)
-            ]
-            # Apply the mask and the noise to the parameters
-            parameters = [
-                param * m * n
-                for param, m, n in zip(parameters, mask, noise, strict=True)
-            ]
+                # Create noise, random sampling (1 - mask), for each layer's parameters
+                # np.random.normal(0, 1, param.shape) * (1 - m)
+                # np.random.rand(*param.shape) < 0.5 * (1 - m)
+                #
+                noise = [
+                    np.random.rand(*param.shape) < 0.5 * (1 - m)
+                    for param, m in zip(parameters, mask, strict=True)
+                ]
+                # Apply the mask and the noise to the parameters
+                parameters = [
+                    param * (m + n)
+                    for param, m, n in zip(parameters, mask, noise, strict=True)
+                ]
+                # parameters = [
+                #     param * m
+                #     for param, m in zip(parameters, mask, strict=True)
+                # ]
 
         self.net = self.set_parameters(
             parameters,
@@ -215,6 +215,20 @@ class Client(fl.client.NumPyClient):
         del _config
 
         config.run_config["device"] = obtain_device()
+
+        # Check, from the config, if the mask has to be used
+        if config.extra["mask"]:
+            # mask_path = self.working_dir / f"mask_{self.cid}.npy"
+            mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+            if mask_path.exists():
+                with open(mask_path, "rb") as f:
+                    mask = pickle.load(f)
+                # print(f"[EVAL{self.cid}] Used Mask, saved in: ", mask_path)
+                # Apply the to the parameters
+                parameters = [
+                    param * m for param, m in zip(parameters, mask, strict=True)
+                ]
+
         self.net = self.set_parameters(
             parameters,
             config.net_config,

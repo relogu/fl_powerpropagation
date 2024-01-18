@@ -76,7 +76,7 @@ def train(  # pylint: disable=too-many-arguments
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.001,  # 0.0005
+        weight_decay=0.0005,  # swat:0.0005 previus:0.001 ?
     )
 
     final_epoch_per_sample_loss = 0.0

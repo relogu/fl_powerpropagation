@@ -18,7 +18,6 @@ Paper: arxiv.org/abs/1602.05629
 """
 
 
-from ast import Dict
 from logging import WARNING
 from typing import Optional, Union
 from collections.abc import Callable
@@ -43,7 +42,6 @@ from flwr.server.strategy.aggregate import weighted_loss_avg
 from flwr.server.strategy.strategy import Strategy
 
 from functools import reduce
-from typing import List, Tuple
 
 import numpy as np
 
@@ -55,7 +53,7 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 """
 
 
-def original_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def original_aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -73,7 +71,7 @@ def original_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     return weights_prime
 
 
-def old_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def old_aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average for non-zero weights."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -98,14 +96,14 @@ def old_aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     return weights_prime
 
 
-def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
+def non_zero_avg_aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average for non-zero weights."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
 
     # Create a list of weights, each multiplied by the related number of examples
     weighted_weights = [
-        [(layer * num_examples, layer != 0) for layer in weights]  # Modify this line
+        [(layer * num_examples, layer != 0) for layer in weights]
         for weights, num_examples in results
     ]
 
@@ -121,8 +119,39 @@ def aggregate(results: List[Tuple[NDArrays, int]]) -> NDArrays:
     return weights_prime
 
 
+# voting
+def aggregate(results: list[tuple[NDArrays, int]], N: int = 5) -> NDArrays:
+    """Compute weighted average for non-zero weights if they are non-zero in at least N
+    samples."""
+    # Calculate the total number of examples used during training
+    num_examples_total = sum([num_examples for _, num_examples in results])
+
+    # Create a list of weights, each multiplied by the related number of examples
+    weighted_weights = [
+        [(layer * num_examples, layer != 0) for layer in weights]
+        for weights, num_examples in results
+    ]
+
+    # Compute average weights of each layer
+    weights_prime: NDArrays = [
+        (
+            np.divide(
+                np.sum([mask * layer for layer, mask in layer_updates], axis=0),
+                num_examples_total,
+                where=(num_examples_total > 0),
+            )
+            if np.sum([mask for _, mask in layer_updates]) >= N
+            else np.zeros_like(
+                next(layer for layer, _ in layer_updates if layer is not None)
+            )
+        )
+        for layer_updates in zip(*weighted_weights)
+    ]
+    return weights_prime
+
+
 # pylint: disable=line-too-long
-class FedAvgC(Strategy):
+class FedAvgNZ_voting(Strategy):
     """Federated Averaging strategy.
 
     Implementation based on https://arxiv.org/abs/1602.05629

@@ -1,9 +1,9 @@
 ---
 defaults:
   - _self_
-  - task: cifar_powerprop_pruning
-  - fed: cifar
-  - strategy: fedavg_custom
+  - task: cluster_cifar_powerprop_pruning
+  - fed: cluster_cifar
+  - strategy: fedavgNZ
   - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
@@ -51,7 +51,7 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: powerprop_a2_s0.7-lda
+    name: powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
 
 # For Ray cluster usage
 # leave null unless you need 

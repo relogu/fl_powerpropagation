@@ -2,37 +2,45 @@
 # These strings are constants used by the dispatcher to select functionality at runtime
 # Please implement all behaviour in the task-level dispatch.py file and then add the dispatch functions to the top-level dispatch.py
 # Choose the model and dataset
-model_and_data: DEFAULT
+model_and_data: SWAT_RESNET
 # Choose the train, test and server fed_eval functions
-train_structure: DEFAULT
+train_structure: SWAT
+
+alpha: 1
+sparsity: 0.7
 
 # Client fit config
 fit_config:
-  # Default net is empty and takes no args
+  # Net does not require any configuration
   net_config: {}
-  # Default dataloader is empty, added just for completeness
+  # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 1
-  # Default train does nothing
-  run_config: {}
-  extra: {}
+    batch_size: 125
+  # The train function requires epochs and learning_rate
+  run_config:
+    epochs: 2
+    learning_rate: 0.03
+  # No extra config
+  extra: {mask: true}
 
 # Client eval config
 eval_config:
   net_config: {}
-  # The batch size for testing can be as high as the GPU supports
+  # The testing function batch size can be as high as the GPU supports
   dataloader_config:
-    batch_size: 8
+    batch_size: 256
+  # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {}
+  extra: {mask: true}
 
 # Configuration for the federated testing function
 # Follows the same conventions as the client config
 fed_test_config:
   net_config: {}
-  # Testing batch size can be as high as the GPU supports
+  # The testing function batch size can be as high as the GPU supports
   dataloader_config:
-    batch_size: 8
+    batch_size: 256
+  # Unlike train, the mnist train function takes no parameters?
   run_config: {}
   extra: {}
 
@@ -41,6 +49,5 @@ fed_test_config:
 net_config_initial_parameters: {}
 
 # The names of metrics you wish to aggregate
-# E.g., train_loss, test_accuracy
-fit_metrics: []
-evaluate_metrics: []
+fit_metrics: [train_loss, train_accuracy]
+evaluate_metrics: [test_accuracy]

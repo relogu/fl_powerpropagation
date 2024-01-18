@@ -1,9 +1,9 @@
 ---
 defaults:
   - _self_
-  - task: cifar_swat
-  - fed: cifar
-  - strategy: fedavg_custom
+  - task: cluster_cifar_swat
+  - fed: cluster_cifar
+  - strategy: fedavgNZ
   - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
@@ -52,7 +52,7 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: swat_a4_s0.7-lda-ep1-fedc-lr0.05
+    name: swat-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}-ModN-U-Voting3-WD
 
 # For Ray cluster usage
 # leave null unless you need 

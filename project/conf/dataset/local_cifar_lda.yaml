@@ -28,7 +28,7 @@ iid: false
 power_law: false
 
 lda: true
-lda_alpha: 1.0
+lda_alpha: 0.1  # ? maybe shold be moved 
 
 # If the partition labels should be balanced
 balance: false

@@ -141,9 +141,13 @@ def replace_layer_with_swat(
     name: str = "Model",
     alpha: float = 2.0,
     sparsity: float = 0.3,
+    skip_first: bool = True,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
     for attr_str in dir(module):
+        # Skip the first layer, as in SWAT-U
+        # if skip_first and attr_str in ["conv1", "0"]: continue
+
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:
             new_conv = SWATConv2D(
@@ -171,7 +175,9 @@ def replace_layer_with_swat(
             setattr(module, attr_str, new_conv)
 
     for model, immediate_child_module in module.named_children():
-        replace_layer_with_swat(immediate_child_module, model, alpha, sparsity)
+        replace_layer_with_swat(
+            immediate_child_module, model, alpha, sparsity, skip_first=False
+        )
 
 
 def get_network_generator_resnet_swat(
