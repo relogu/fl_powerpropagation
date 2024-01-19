@@ -150,6 +150,57 @@ class Client(fl.client.NumPyClient):
                 #     param * m
                 #     for param, m in zip(parameters, mask, strict=True)
                 # ]
+        """
+        # Alternative way to create the mask
+         if config.extra["mask"]:
+    mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+    if mask_path.exists():
+        with open(mask_path, "rb") as f:
+            mask = pickle.load(f)
+    else:
+        # Create a Bayesian mask using the Beta distribution
+        mask = [beta.rvs(1, 1, size=param.shape) for param in parameters]
+
+    # Create noise, random sampling (1 - mask), for each layer's parameters
+    noise = [
+        np.random.rand(*param.shape) < 0.5 * (1 - m)
+        for param, m in zip(parameters, mask)
+    ]
+
+    # Apply the mask and the noise to the parameters
+    parameters = [
+        param * (m + n)
+        for param, m, n in zip(parameters, mask, noise)
+    ]
+        """
+
+        """
+            if config.extra["mask"]:
+    mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+    if mask_path.exists():
+        with open(mask_path, "rb") as f:
+            mask = pickle.load(f)
+    else:
+        # Initialize the mask to give more importance to the early and late layers
+        mask = [
+            np.ones_like(param)
+            if i < len(parameters) // 4
+            or i >= 3 * len(parameters) // 4
+            else np.zeros_like(param) for i, param in enumerate(parameters)]
+
+    # Create noise, random sampling (1 - mask), for each layer's parameters
+    noise = [
+        np.random.rand(*param.shape) < 0.5 * (1 - m)
+        for param, m in zip(parameters, mask)
+    ]
+
+    # Apply the mask and the noise to the parameters
+    parameters = [
+        param * (m + n)
+        for param, m, n in zip(parameters, mask, noise)
+    ]
+
+        """
 
         self.net = self.set_parameters(
             parameters,

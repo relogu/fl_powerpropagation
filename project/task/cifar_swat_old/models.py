@@ -67,8 +67,8 @@ class NetCifarResnet18(nn.Module):
         self.num_classes = num_classes
         self.device = device
         # As the LEAF people do
-        self.net = resnet18(num_classes=10, norm_layer=lambda x: nn.GroupNorm(2, x))
-        # self.net = resnet18(num_classes=self.num_classes)
+        # self.net = resnet18(num_classes=10, norm_layer=lambda x: nn.GroupNorm(2, x))
+        self.net = resnet18(num_classes=self.num_classes)
         # replace w/ smaller input layer
         self.net.conv1 = nn.Conv2d(
             3, 64, kernel_size=3, stride=1, padding=1, bias=False
@@ -146,7 +146,7 @@ def replace_layer_with_swat(
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
     for attr_str in dir(module):
         # Skip the first layer, as in SWAT-U
-        # ? if skip_first and attr_str in ["conv1", "0"]: continue
+        # if skip_first and attr_str in ["conv1", "0"]: continue
 
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:

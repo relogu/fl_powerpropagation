@@ -31,7 +31,7 @@ eval_config:
     batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {}
+  extra: {mask: false}
 
 # Configuration for the federated testing function
 # Follows the same conventions as the client config

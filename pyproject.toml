@@ -89,7 +89,7 @@ target-version = ["py311"]
 ignore_missing_imports = true
 strict = false
 plugins = "numpy.typing.mypy_plugin"
-exclude = "project/fed/server/strategy/fedavg_custom.py"
+exclude = "project/fed/server/strategy"
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = "bad-continuation,duplicate-code,too-few-public-methods,useless-import-alias,import-error,no-member,no-name-in-module"
@@ -195,8 +195,7 @@ exclude = [
     "venv",
     "proto",
     "project/task/utils",
-    "project/fed/server/strategy/fedavgNZ.py",
-    "project/fed/server/strategy/fedavgNZ_voting.py",
+    "project/fed/server/strategy",
     "project/task/cifar_resnet18/common.py"
 ]
 

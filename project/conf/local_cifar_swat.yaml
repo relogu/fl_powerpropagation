@@ -4,7 +4,7 @@ defaults:
   - task: local_cifar_swat
   - fed: local_cifar
   - strategy: fedavg
-  - dataset: local_cifar_lda
+  - dataset: local_cifar_iid
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -42,10 +42,10 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: template
+    project: local_tests
     tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
     entity: null
-    mode: offline
+    mode: online
     name: swat-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}-ModNoise
 
 # For Ray cluster usage
