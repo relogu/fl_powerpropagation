@@ -6,8 +6,10 @@ model_and_data: SWAT_RESNET
 # Choose the train, test and server fed_eval functions
 train_structure: SWAT
 
+# Add something like swat_config:
 alpha: 4
 sparsity: 0.5
+pruning_type: unstructured
 
 # Client fit config
 fit_config:

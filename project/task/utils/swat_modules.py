@@ -260,7 +260,7 @@ class SWATConv2D(nn.Module):
         groups: _int = 1,
         bias: bool = False,
         sparsity: float = 0.3,
-        pruning_type: str = "structured_filter",  # ????
+        pruning_type: str = "unstructured",  # ????
         warm_up: int = 0,
         period: int = 1,
     ):

@@ -119,11 +119,14 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
 
         alpha: float = cfg.get("task", {}).get("alpha", 4)
         sparsity: float = cfg.get("task", {}).get("sparsity", 0.7)
+        pruning_type: float = cfg.get("task", {}).get("pruning_type", "unstructured")
 
         # Case insensitive matches
         if client_model_and_data.upper() == "SWAT_RESNET":
             return (
-                get_network_generator_resnet_swat(alpha=alpha, sparsity=sparsity),
+                get_network_generator_resnet_swat(
+                    alpha=alpha, sparsity=sparsity, pruning_type=pruning_type
+                ),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )
