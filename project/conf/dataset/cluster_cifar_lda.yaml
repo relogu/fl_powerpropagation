@@ -30,7 +30,7 @@ power_law: false
 
 # If the partition labels should follow a lda distribution
 lda: true
-lda_alpha: 1.0
+lda_alpha: 0.1
 
 # If the partition labels should be balanced
 balance: false

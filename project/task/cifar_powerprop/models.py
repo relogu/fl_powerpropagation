@@ -6,7 +6,7 @@ from torch import nn
 import numpy as np
 
 from copy import deepcopy
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from project.types.common import NetGen
 from project.utils.utils import lazy_config_wrapper
@@ -193,3 +193,38 @@ def get_network_generator_resnet_powerprop(
         return deepcopy(untrained_net)
 
     return generated_net
+
+
+def get_parameters_to_prune(
+    net: nn.Module,
+) -> Iterable[tuple[nn.Module, str, str]]:
+    """Pruning.
+
+    Return an iterable of tuples containing the PowerPropConv2D layers in the input
+    model.
+    """
+    parameters_to_prune = []
+    first_layer = True
+
+    def add_immediate_child(
+        module: nn.Module,
+        name: str,
+    ) -> None:
+        nonlocal first_layer
+        if (
+            type(module) == PowerPropConv2D
+            or type(module) == PowerPropLinear
+            or type(module) == nn.Conv2d
+            or type(module) == nn.Linear
+        ):
+            if first_layer:
+                first_layer = False
+            else:
+                parameters_to_prune.append((module, "weight", name))
+
+        for _name, immediate_child_module in module.named_children():
+            add_immediate_child(immediate_child_module, _name)
+
+    add_immediate_child(net, "Net")
+
+    return parameters_to_prune

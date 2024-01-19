@@ -8,7 +8,7 @@ model_and_data: POWERPROP_NEW
 train_structure: CIFAR_PRUNE
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
-alpha: 4
+alpha: 2
 sparsity: 0.7
 
 # Client fit config
