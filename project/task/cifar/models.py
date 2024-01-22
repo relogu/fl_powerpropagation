@@ -237,7 +237,7 @@ def get_parameters_to_prune(
             parameters_to_prune.append((module, "weight", name))
 
         for _name, immediate_child_module in module.named_children():
-            add_immediate_child(immediate_child_module, _name, False)
+            add_immediate_child(immediate_child_module, _name)
 
     add_immediate_child(net, "Net")
 

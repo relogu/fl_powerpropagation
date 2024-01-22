@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: cluster_cifar_swat
   - fed: cluster_cifar
-  - strategy: fedavgNZ
+  - strategy: fedavg
   - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
