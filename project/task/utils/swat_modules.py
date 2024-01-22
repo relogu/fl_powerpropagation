@@ -170,8 +170,9 @@ class SWATLinear(nn.Module):
         if self.alpha == 1.0:
             powerprop_weight = self.weight
         else:
-            powerprop_weight = self.weight * torch.pow(
-                torch.abs(self.weight), self.alpha - 1.0
+            # powerprop_weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
+            powerprop_weight = torch.sign(self.weight) * torch.pow(
+                torch.abs(self.weight), self.alpha
             )
 
         # Perform SWAT forward pass
@@ -351,8 +352,9 @@ class SWATConv2D(nn.Module):
         if self.alpha == 1.0:
             powerprop_weight = self.weight
         else:
-            powerprop_weight = self.weight * torch.pow(
-                torch.abs(self.weight), self.alpha - 1.0
+            # powerprop_weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
+            powerprop_weight = torch.sign(self.weight) * torch.pow(
+                torch.abs(self.weight), self.alpha
             )
 
         # Perform the forward pass

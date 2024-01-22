@@ -98,11 +98,6 @@ def init_weights(module: nn.Module) -> None:
         a, b = -2.0 * std, 2.0 * std
 
         u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
-        """' if isinstance( module,
-
-        PowerPropLinear | PowerPropConv2D, ):     u = torch.sign(u) *
-        torch.pow(torch.abs(u), 1.0 / module.alpha)
-        """
 
         module.weight.data = u
         if module.bias is not None:

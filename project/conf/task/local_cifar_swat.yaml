@@ -6,7 +6,7 @@ model_and_data: SWAT_RESNET
 # Choose the train, test and server fed_eval functions
 train_structure: SWAT
 
-alpha: 4
+alpha: 1.5
 sparsity: 0.5
 
 # Client fit config

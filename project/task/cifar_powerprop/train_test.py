@@ -93,14 +93,13 @@ def train(  # pylint: disable=too-many-arguments
         final_epoch_per_sample_loss = 0.0
         num_correct = 0
         for data, target in trainloader:
-            # print(f"[train]     PROVA PROVA")
             data, target = (
                 data.to(
                     config.device,
                 ),
                 target.to(config.device),
             )
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             output = net(data)
             loss = criterion(output, target)
             final_epoch_per_sample_loss += loss.item()

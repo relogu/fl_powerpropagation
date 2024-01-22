@@ -150,6 +150,7 @@ class Client(fl.client.NumPyClient):
                 #     param * m
                 #     for param, m in zip(parameters, mask, strict=True)
                 # ]
+
         """
         # Alternative way to create the mask
          if config.extra["mask"]:

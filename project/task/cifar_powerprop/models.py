@@ -108,6 +108,7 @@ def init_weights(module: nn.Module) -> None:
             PowerPropLinear | PowerPropConv2D,
         ):
             u = torch.sign(u) * torch.pow(torch.abs(u), 1.0 / module.alpha)
+            # u = torch.sign(u) * torch.pow(torch.abs(u), module.alpha)
 
         module.weight.data = u
         if module.bias is not None:
