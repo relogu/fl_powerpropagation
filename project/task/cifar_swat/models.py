@@ -141,6 +141,7 @@ def replace_layer_with_swat(
     name: str = "Model",
     alpha: float = 2.0,
     sparsity: float = 0.3,
+    pruning_type: str = "unstructured",
     skip_first: bool = True,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
@@ -159,7 +160,9 @@ def replace_layer_with_swat(
                 padding=target_attr.padding,
                 stride=target_attr.stride,
                 sparsity=sparsity,
-                pruning_type="unstructured",
+                pruning_type=pruning_type,
+                # pruning_type="structured_channel",
+                # pruning_type="structured_filter",
                 warm_up=0,
                 period=1,
             )
@@ -181,7 +184,7 @@ def replace_layer_with_swat(
 
 
 def get_network_generator_resnet_swat(
-    alpha: float = 4, sparsity: float = 0.7
+    alpha: float = 4, sparsity: float = 0.7, pruning_type: str = "unstructured"
 ) -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
@@ -191,6 +194,7 @@ def get_network_generator_resnet_swat(
         name="NetCifarResnet18",
         alpha=alpha,
         sparsity=sparsity,
+        pruning_type=pruning_type,
     )
 
     def init_model(

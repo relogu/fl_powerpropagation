@@ -283,7 +283,7 @@ def train_swat_test(
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.001,  # ?
+        weight_decay=0.0005,  # ? 0.001
     )
     optimizer.step()
     # net_compare(net, _net, "train")

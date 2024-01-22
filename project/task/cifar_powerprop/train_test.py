@@ -7,7 +7,7 @@ from typing import cast
 import logging
 from logging import ERROR
 from flwr.common import log
-from project.task.cifar.models import (
+from project.task.cifar_powerprop.models import (
     get_parameters_to_prune,
 )
 
