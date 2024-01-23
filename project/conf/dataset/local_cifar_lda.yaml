@@ -1,5 +1,5 @@
 ---
-name: cifar_lda
+name: cifar_lda${dataset.lda_alpha}
 
 # Where to store data
 dataset_dir: ./data/cifar/data

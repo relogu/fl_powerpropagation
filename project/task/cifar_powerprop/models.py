@@ -170,6 +170,15 @@ def replace_layer_with_powerprop(
         replace_layer_with_powerprop(immediate_child_module, model, alpha)
 
 
+def init_model(
+    module: nn.Module,
+) -> None:
+    """Initialize the weights of the layers."""
+    init_weights(module)
+    for _, immediate_child_module in module.named_children():
+        init_model(immediate_child_module)
+
+
 def get_network_generator_resnet_powerprop(
     alpha: float = 4.0,
 ) -> Callable[[dict], NetCifarResnet18]:
@@ -180,13 +189,6 @@ def get_network_generator_resnet_powerprop(
         name="NetCifarResnet18",
         alpha=alpha,
     )
-
-    def init_model(
-        module: nn.Module,
-    ) -> None:
-        init_weights(module)
-        for _, immediate_child_module in module.named_children():
-            init_model(immediate_child_module)
 
     init_model(untrained_net)
 

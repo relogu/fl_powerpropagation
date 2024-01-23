@@ -41,6 +41,7 @@ class PowerPropLinear(nn.Module):
     def get_weight(self):
         weight = self.weight.detach()
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
+        # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
@@ -94,6 +95,7 @@ class PowerPropConv2D(nn.Module):
     def get_weights(self):
         weights = self.weight.detach()
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
+        # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
