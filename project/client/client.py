@@ -6,6 +6,7 @@ Make sure the model and dataset are not loaded before the fit function.
 from pathlib import Path
 import pickle
 
+
 import flwr as fl
 from flwr.common import NDArrays
 import numpy as np
@@ -15,6 +16,7 @@ from torch import nn
 from project.fed.utils.utils import (
     generic_get_parameters,
     generic_set_parameters,
+    print_nonzeros,
 )
 from project.types.common import (
     ClientDataloaderGen,
@@ -138,12 +140,13 @@ class Client(fl.client.NumPyClient):
                 # np.random.rand(*param.shape) < 0.5 * (1 - m)
                 #
                 noise = [
-                    np.random.rand(*param.shape) < 0.5 * (1 - m)
+                    np.random.rand(*param.shape) < 0.01 * (1 - m)
                     for param, m in zip(parameters, mask, strict=True)
                 ]
                 # Apply the mask and the noise to the parameters
                 parameters = [
-                    param * (m + n)
+                    # param * (m + n)
+                    (param * m) + n
                     for param, m, n in zip(parameters, mask, noise, strict=True)
                 ]
                 # parameters = [
@@ -176,30 +179,28 @@ class Client(fl.client.NumPyClient):
         """
 
         """
-            if config.extra["mask"]:
-    mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-    if mask_path.exists():
-        with open(mask_path, "rb") as f:
-            mask = pickle.load(f)
-    else:
-        # Initialize the mask to give more importance to the early and late layers
-        mask = [
-            np.ones_like(param)
-            if i < len(parameters) // 4
-            or i >= 3 * len(parameters) // 4
-            else np.zeros_like(param) for i, param in enumerate(parameters)]
-
-    # Create noise, random sampling (1 - mask), for each layer's parameters
-    noise = [
-        np.random.rand(*param.shape) < 0.5 * (1 - m)
-        for param, m in zip(parameters, mask)
-    ]
-
-    # Apply the mask and the noise to the parameters
-    parameters = [
-        param * (m + n)
-        for param, m, n in zip(parameters, mask, noise)
-    ]
+    if config.extra["mask"]:
+        mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+        if mask_path.exists():
+            with open(mask_path, "rb") as f:
+                mask = pickle.load(f)
+        else:
+            # Initialize the mask to give more importance to the early and late layers
+            mask = [
+                np.ones_like(param)
+                if i < len(parameters) // 4
+                or i >= 3 * len(parameters) // 4
+                else np.zeros_like(param) for i, param in enumerate(parameters)]
+        # Create noise, random sampling (1 - mask), for each layer's parameters
+        noise = [
+            np.random.rand(*param.shape) < 0.5 * (1 - m)
+            for param, m in zip(parameters, mask)
+        ]
+        # Apply the mask and the noise to the parameters
+        parameters = [
+            param * (m + n)
+            for param, m, n in zip(parameters, mask, noise)
+        ]
 
         """
 
@@ -214,12 +215,16 @@ class Client(fl.client.NumPyClient):
             config.dataloader_config,
         )
 
+        print_nonzeros(self.net, f"[client_{self.cid}] Before training:")
+
         num_samples, metrics = self.train(
             self.net,
             trainloader,
             config.run_config,
             self.working_dir,
         )
+
+        print_nonzeros(self.net, f"[client_{self.cid}] After training:")
 
         trained_parameters = generic_get_parameters(self.net)
 
@@ -290,6 +295,10 @@ class Client(fl.client.NumPyClient):
             True,
             config.dataloader_config,
         )
+
+        # print the number of non zero elements in the net
+        print_nonzeros(self.net, f"[client_{self.cid}] Before evaluation:")
+
         loss, num_samples, metrics = self.test(
             self.net,
             testloader,

@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: local_cifar_resnet18
   - fed: local_cifar
-  - strategy: fedavgNZ
+  - strategy: fedavg
   - dataset: local_cifar_lda
 
 # If running the same experiment multiple times
