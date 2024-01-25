@@ -35,7 +35,7 @@ use_wandb: true
 # Test without Ray to to enable easy error detection
 test_clients:
   all: false
-  one: true
+  one: false
 
 # Wandb configuration
 # add whatever tags you like

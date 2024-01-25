@@ -1,0 +1,17 @@
+---
+project: sweeptry
+program: ./run_script/cifar_resnet18.sh
+name: sweeptry
+method: bayes
+
+metric:
+  goal: maximize
+  name: test_accuracy
+
+parameters:
+  task.fit_config.run_config.learning_rate:
+    values: [0.01, 0.05, 0.1]
+  task.fit_config.dataloader_config.batch_size:
+    values: [32, 64, 128]
+
+command: [sbatch, '${program}', '${args_no_hyphens}']
