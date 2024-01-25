@@ -4,7 +4,7 @@ defaults:
   - task: cluster_cifar_powerprop
   - fed: cluster_cifar
   - strategy: fedavg
-  - dataset: cluster_cifar_iid
+  - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory

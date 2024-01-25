@@ -463,35 +463,39 @@ def download_and_preprocess(cfg: DictConfig) -> None:
         # Save the client datasets
         for idx, client_dataset in enumerate(client_datasets):
             log(logging.INFO, f"client_{idx}: {len(client_dataset)}")
-        client_dir = partition_dir / f"client_{idx}"
-        client_dir.mkdir(parents=True, exist_ok=True)
+            client_dir = partition_dir / f"client_{idx}"
+            client_dir.mkdir(parents=True, exist_ok=True)
 
-        len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
-        lengths = [len(client_dataset) - len_val, len_val]
-        ds_train, ds_val = random_split(
-            client_dataset,
-            lengths,
-            torch.Generator().manual_seed(cfg.dataset.seed),
-        )
+            len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
+            lengths = [len(client_dataset) - len_val, len_val]
+            ds_train, ds_val = random_split(
+                client_dataset,
+                lengths,
+                torch.Generator().manual_seed(cfg.dataset.seed),
+            )
 
-        # Get indices of the subset
-        subset_indices = ds_train.indices
-        # Access the necessary subset tensors
-        ds_train_data = torch.stack([client_dataset[i][0] for i in subset_indices])
-        ds_train_targets = torch.tensor([client_dataset[i][1] for i in subset_indices])
-        # Save the subset tensors in a dictionary format
-        subset_dict = {"data": ds_train_data, "targets": ds_train_targets}
-        torch.save(subset_dict, client_dir / "train.pt")
+            # Get indices of the subset
+            subset_indices = ds_train.indices
+            # Access the necessary subset tensors
+            ds_train_data = torch.stack([client_dataset[i][0] for i in subset_indices])
+            ds_train_targets = torch.tensor([
+                client_dataset[i][1] for i in subset_indices
+            ])
+            # Save the subset tensors in a dictionary format
+            subset_dict = {"data": ds_train_data, "targets": ds_train_targets}
+            torch.save(subset_dict, client_dir / "train.pt")
 
-        subset_indices = ds_val.indices
-        # Access the necessary subset tensors
-        ds_val_data = torch.stack([client_dataset[i][0] for i in subset_indices])
-        ds_val_targets = torch.tensor([client_dataset[i][1] for i in subset_indices])
-        # Save the subset tensors in a dictionary format
-        subset_dict = {"data": ds_val_data, "targets": ds_val_targets}
-        torch.save(subset_dict, client_dir / "test.pt")
+            subset_indices = ds_val.indices
+            # Access the necessary subset tensors
+            ds_val_data = torch.stack([client_dataset[i][0] for i in subset_indices])
+            ds_val_targets = torch.tensor([
+                client_dataset[i][1] for i in subset_indices
+            ])
+            # Save the subset tensors in a dictionary format
+            subset_dict = {"data": ds_val_data, "targets": ds_val_targets}
+            torch.save(subset_dict, client_dir / "test.pt")
 
-        # test_client_dataloader(partition_dir, idx, 64, False)
+            # test_client_dataloader(partition_dir, idx, 64, False)
 
 
 # TEST

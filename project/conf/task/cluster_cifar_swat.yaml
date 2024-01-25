@@ -17,7 +17,7 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 125
+    batch_size: 32
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 2
