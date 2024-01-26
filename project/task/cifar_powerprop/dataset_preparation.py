@@ -1,4 +1,4 @@
-"""Functions for MNIST download and processing."""
+"""Functions for CIFAR download and processing."""
 
 import logging
 from collections.abc import Sequence, Sized
@@ -10,11 +10,13 @@ import numpy as np
 import torch
 from flwr.common.logger import log
 from omegaconf import DictConfig, OmegaConf
-from torch.utils.data import ConcatDataset, Subset, random_split, DataLoader
+from torch.utils.data import ConcatDataset, Subset, random_split
 from torchvision import transforms
 from torchvision.datasets import CIFAR10
 
-from project.utils.utils import obtain_device
+from project.task.utils.common import XYList, create_lda_partitions
+
+HYDRA_FULL_ERROR = 1
 
 
 def _download_data(
@@ -56,8 +58,10 @@ def _partition_data(
     seed: int,
     iid: bool,
     power_law: bool,
+    lda: bool,
+    lda_alpha: float,
     balance: bool,
-) -> tuple[list[Subset] | list[ConcatDataset], CIFAR10]:
+) -> tuple[list[Subset] | list[ConcatDataset] | tuple[XYList, np.ndarray], CIFAR10]:
     """Split training set into iid or non iid partitions to simulate the federated.
 
     setting.
@@ -110,6 +114,17 @@ def _partition_data(
             mean=0.0,
             sigma=2.0,
         )
+    elif lda:
+        x = torch.from_numpy(np.array([sample[0] for sample in trainset]))
+        y = torch.from_numpy(np.array([sample[1] for sample in trainset]))
+        # Pack into a tuple
+        xy = (x, y)
+        datasets = create_lda_partitions(
+            dataset=xy,
+            num_partitions=num_clients,
+            concentration=lda_alpha,
+        )
+
     else:
         shard_size = int(partition_size / 2)
         idxs = trainset.targets.argsort()
@@ -361,7 +376,7 @@ def _power_law_split(
 
 @hydra.main(
     config_path="../../conf",
-    config_name="cifar_powerprop",
+    config_name="base",
     version_base=None,
 )
 def download_and_preprocess(cfg: DictConfig) -> None:
@@ -378,6 +393,13 @@ def download_and_preprocess(cfg: DictConfig) -> None:
     """
     # 1. print parsed config
     log(logging.INFO, OmegaConf.to_yaml(cfg))
+
+    # Check if the partitioning already exists
+    if Path.exists(Path(cfg.dataset.partition_dir)):
+        log(
+            logging.INFO, f"Partitioning already exists at: {cfg.dataset.partition_dir}"
+        )
+        return
 
     # Download the dataset
     trainset, testset = _download_data(
@@ -396,6 +418,8 @@ def download_and_preprocess(cfg: DictConfig) -> None:
         cfg.dataset.seed,
         cfg.dataset.iid,
         cfg.dataset.power_law,
+        cfg.dataset.lda,
+        cfg.dataset.lda_alpha,
         cfg.dataset.balance,
     )
 
@@ -404,93 +428,73 @@ def download_and_preprocess(cfg: DictConfig) -> None:
     partition_dir = Path(cfg.dataset.partition_dir)
     partition_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save the centralised test set
-    # a centrailsed training set would also be possible
+    # Save the centralised test set a centrailsed training set would also be possible
     # but is not used here
     torch.save(fed_test_set, partition_dir / "test.pt")
 
-    # Save the client datasets
-    for idx, client_dataset in enumerate(client_datasets):
-        log(logging.INFO, f"client_{idx}: {len(client_dataset)}")
-        client_dir = partition_dir / f"client_{idx}"
-        client_dir.mkdir(parents=True, exist_ok=True)
+    if cfg.dataset.lda:
+        client_trainsets = client_datasets[0]
 
-        len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
-        lengths = [len(client_dataset) - len_val, len_val]
-        ds_train, ds_val = random_split(
-            client_dataset,
-            lengths,
-            torch.Generator().manual_seed(cfg.dataset.seed),
+        # Create the test sets for each client, following the same distribution
+        dirichlet_dict = client_datasets[1]
+        x = torch.from_numpy(np.array([sample[0] for sample in fed_test_set]))
+        y = torch.from_numpy(np.array([sample[1] for sample in fed_test_set]))
+        xy = (x, y)
+        client_testsets, _ = create_lda_partitions(
+            dataset=xy,
+            dirichlet_dist=dirichlet_dict,
+            num_partitions=cfg.dataset.num_clients,
+            concentration=cfg.dataset.lda_alpha,
         )
 
-        # Get indices of the subset
-        subset_indices = ds_train.indices
-        # Access the necessary subset tensors
-        ds_train_data = torch.stack([client_dataset[i][0] for i in subset_indices])
-        ds_train_targets = torch.tensor([client_dataset[i][1] for i in subset_indices])
-        # Save the subset tensors in a dictionary format
-        subset_dict = {"data": ds_train_data, "targets": ds_train_targets}
-        torch.save(subset_dict, client_dir / "train.pt")
+        for idx, client_dataset in enumerate(client_trainsets):
+            log(logging.INFO, len(client_dataset[0]))
+            client_dir = partition_dir / f"client_{idx}"
+            client_dir.mkdir(parents=True, exist_ok=True)
 
-        subset_indices = ds_val.indices
-        # Access the necessary subset tensors
-        ds_val_data = torch.stack([client_dataset[i][0] for i in subset_indices])
-        ds_val_targets = torch.tensor([client_dataset[i][1] for i in subset_indices])
-        # Save the subset tensors in a dictionary format
-        subset_dict = {"data": ds_val_data, "targets": ds_val_targets}
-        torch.save(subset_dict, client_dir / "test.pt")
+            # Saving the client trainset
+            subset_dict = {"data": client_dataset[0], "targets": client_dataset[1]}
+            torch.save(subset_dict, client_dir / "train.pt")
 
-        # client_dataloader(partition_dir, idx, 64, False)
+            # Saving the client testset
+            subset_dict = {
+                "data": client_testsets[idx][0],
+                "targets": client_testsets[idx][1],
+            }
+            torch.save(subset_dict, client_dir / "test.pt")
 
-
-# For testing
-def client_dataloader(
-    partition_dir: Path,
-    cid: str | int,
-    batch_size: int,
-    test: bool,
-) -> DataLoader:
-    """Return a DataLoader for a client's dataset.
-
-    Parameters
-    ----------
-    cid : str|int
-        The client's ID
-    test : bool
-        Whether to load the test set or not
-    config : Dict
-        The configuration for the dataset
-
-    Returns
-    -------
-    DataLoader
-        The DataLoader for the client's dataset
-    """
-    client_dir = partition_dir / f"client_{cid}"
-    if not test:
-        dataset = torch.load(client_dir / "train.pt")
     else:
-        dataset = torch.load(client_dir / "test.pt")
+        # Save the client datasets
+        for idx, client_dataset in enumerate(client_datasets):
+            log(logging.INFO, f"client_{idx}: {len(client_dataset)}")
+            client_dir = partition_dir / f"client_{idx}"
+            client_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset_loader = DataLoader(
-        list(zip(dataset["data"], dataset["targets"], strict=True)),
-        batch_size=batch_size,
-        shuffle=not test,
-    )
+            len_val = int(len(client_dataset) / (1 / cfg.dataset.val_ratio))
+            lengths = [len(client_dataset) - len_val, len_val]
+            ds_train, ds_val = random_split(
+                client_dataset,
+                lengths,
+                torch.Generator().manual_seed(cfg.dataset.seed),
+            )
 
-    device = obtain_device()
-    # for data, target in list(zip(dataset['data'], dataset['targets'])):
-    for data, target in dataset_loader:
-        data, target = (
-            data.to(
-                device,
-            ),
-            target.to(device),
-        )
-        break
+            # Get indices of the subset
+            subset_indices = ds_train.indices
+            # Access the necessary subset tensors
+            ds_train_data = torch.stack([client_dataset[i][0] for i in subset_indices])
+            ds_train_targets = torch.tensor([
+                client_dataset[i][1] for i in subset_indices
+            ])
+            # Save the subset tensors in a dictionary format
+            subset_dict = {"data": ds_train_data, "targets": ds_train_targets}
+            torch.save(subset_dict, client_dir / "train.pt")
 
-    return dataset_loader
-
-
-if __name__ == "__main__":
-    download_and_preprocess()
+            subset_indices = ds_val.indices
+            # Access the necessary subset tensors
+            ds_val_data = torch.stack([client_dataset[i][0] for i in subset_indices])
+            ds_val_targets = torch.tensor([
+                client_dataset[i][1] for i in subset_indices
+            ])
+            # Save the subset tensors in a dictionary format
+            subset_dict = {"data": ds_val_data, "targets": ds_val_targets}
+            torch.save(subset_dict, client_dir / "test.pt")

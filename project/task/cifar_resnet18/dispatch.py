@@ -114,7 +114,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         # for the provided partition dir
         (
             client_dataloader_gen,
-            fed_dataloater_gen,
+            fed_dataloader_gen,
         ) = get_dataloader_generators(
             Path(partition_dir),
         )
@@ -124,7 +124,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             return (
                 get_resnet18(),
                 client_dataloader_gen,
-                fed_dataloater_gen,
+                fed_dataloader_gen,
             )
 
     # Cannot match, send to next dispatch in chain

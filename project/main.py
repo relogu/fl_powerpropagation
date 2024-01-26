@@ -36,6 +36,7 @@ from project.fed.utils.utils import (
     get_weighted_avg_metrics_agg_fn,
     test_client,
 )
+from project.task.cifar_resnet18.dataset_preparation import download_and_preprocess
 from project.types.common import ClientGen, FedEvalFN
 from project.utils.utils import (
     FileSystemManager,
@@ -161,6 +162,9 @@ def main(cfg: DictConfig) -> None:
             # If you want to change them
             # add functionality to project.dispatch and then
             # to the individual dispatch.py file of each task
+
+            # Create the partitions if necessary
+            download_and_preprocess(cfg)
 
             # Obtain the net generator, dataloader and fed_dataloader
             # Change the cfg.task.model_and_data str to change functionality

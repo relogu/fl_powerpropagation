@@ -15,7 +15,7 @@ from torchvision import transforms
 from torchvision.datasets import CIFAR10
 
 from project.utils.utils import obtain_device
-from project.task.cifar_resnet18.common import XYList, create_lda_partitions
+from project.task.utils.common import XYList, create_lda_partitions
 
 HYDRA_FULL_ERROR = 1
 
@@ -377,8 +377,7 @@ def _power_law_split(
 
 @hydra.main(
     config_path="../../conf",
-    config_name="local_cifar_resnet18",
-    # config_name="cluster_cifar_resnet18",
+    config_name="base",
     version_base=None,
 )
 def download_and_preprocess(cfg: DictConfig) -> None:
@@ -395,6 +394,13 @@ def download_and_preprocess(cfg: DictConfig) -> None:
     """
     # 1. print parsed config
     log(logging.INFO, OmegaConf.to_yaml(cfg))
+
+    # Check if the partitioning already exists
+    if Path.exists(Path(cfg.dataset.partition_dir)):
+        log(
+            logging.INFO, f"Partitioning already exists at: {cfg.dataset.partition_dir}"
+        )
+        return
 
     # Download the dataset
     trainset, testset = _download_data(
@@ -458,7 +464,6 @@ def download_and_preprocess(cfg: DictConfig) -> None:
             }
             torch.save(subset_dict, client_dir / "test.pt")
 
-            # test_client_dataloader(partition_dir, idx, 64, True)
     else:
         # Save the client datasets
         for idx, client_dataset in enumerate(client_datasets):
@@ -494,8 +499,6 @@ def download_and_preprocess(cfg: DictConfig) -> None:
             # Save the subset tensors in a dictionary format
             subset_dict = {"data": ds_val_data, "targets": ds_val_targets}
             torch.save(subset_dict, client_dir / "test.pt")
-
-            # test_client_dataloader(partition_dir, idx, 64, False)
 
 
 # TEST

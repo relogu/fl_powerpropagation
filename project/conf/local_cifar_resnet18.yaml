@@ -4,7 +4,7 @@ defaults:
   - task: local_cifar_resnet18
   - fed: local_cifar
   - strategy: fedavg
-  - dataset: local_cifar_lda
+  - dataset: local_cifar_iid
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory

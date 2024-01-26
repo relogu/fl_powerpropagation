@@ -27,5 +27,9 @@ iid: true
 # distribution
 power_law: true
 
+# If the partition labels should follow a lda distribution
+lda: false
+lda_alpha: 0.1
+
 # If the partition labels should be balanced
 balance: false
