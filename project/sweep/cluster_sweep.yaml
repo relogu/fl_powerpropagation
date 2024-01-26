@@ -1,6 +1,6 @@
 ---
 project: sweeptry
-program: ./run_script/cifar_resnet18.sh
+program: project.main
 name: sweeptry
 method: bayes
 
@@ -14,4 +14,11 @@ parameters:
   task.fit_config.dataloader_config.batch_size:
     values: [32, 64, 128]
 
-command: [sbatch, '${program}', '${args_no_hyphens}']
+command:
+  - poetry
+  - run
+  - python
+  - -m
+  - ${program}
+  - --config-name=cluster_cifar_resnet18
+  - ${args_no_hyphens}
