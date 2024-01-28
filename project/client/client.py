@@ -139,14 +139,15 @@ class Client(fl.client.NumPyClient):
                 # np.random.normal(0, 1, param.shape) * (1 - m)
                 # np.random.rand(*param.shape) < 0.5 * (1 - m)
                 #
+
                 noise = [
-                    np.random.rand(*param.shape) < 0.01 * (1 - m)
+                    np.random.rand(*param.shape) < config.extra["noise"] * (1 - m)
                     for param, m in zip(parameters, mask, strict=True)
                 ]
                 # Apply the mask and the noise to the parameters
                 parameters = [
-                    # param * (m + n)
-                    (param * m) + n
+                    param * (m + n)
+                    # (param * m) + n
                     for param, m, n in zip(parameters, mask, noise, strict=True)
                 ]
                 # parameters = [
@@ -156,7 +157,7 @@ class Client(fl.client.NumPyClient):
 
         """
         # Alternative way to create the mask
-         if config.extra["mask"]:
+        if config.extra["mask"]:
     mask_path = self.working_dir / f"mask_{self.cid}.pickle"
     if mask_path.exists():
         with open(mask_path, "rb") as f:
@@ -215,7 +216,7 @@ class Client(fl.client.NumPyClient):
             config.dataloader_config,
         )
 
-        print_nonzeros(self.net, f"[client_{self.cid}] Before training:")
+        # print_nonzeros(self.net, f"[client_{self.cid}] Before training:")
 
         num_samples, metrics = self.train(
             self.net,
@@ -224,7 +225,7 @@ class Client(fl.client.NumPyClient):
             self.working_dir,
         )
 
-        print_nonzeros(self.net, f"[client_{self.cid}] After training:")
+        # print_nonzeros(self.net, f"[client_{self.cid}] After training:")
 
         trained_parameters = generic_get_parameters(self.net)
 

@@ -1,7 +1,7 @@
 ---
-project: sweeptry
+project: sweep_cluster_powerprop
 program: project.main
-name: sweep_local_swat
+name: sweep_cluster_powerprop
 method: bayes
 
 metric:
@@ -10,17 +10,14 @@ metric:
 
 parameters:
   task.alpha:
-    values: [1.0, 1.5, 2.0, 4]
-  task.sparsity:
-    values: [0.5, 0.7, 0.9]
-  task.pruning_type:
-    values: [unstructured, structured_channel, structured_filter]
+    min: 1.0
+    max: 4.0
   task.fit_config.run_config.learning_rate:
     min: 0.001
     max: 0.1
-  # task.fit_config.run_config.epochs:
-  #   min: 1
-  #   max: 10
+  task.fit_config.run_config.epochs:
+    min: 1
+    max: 10
   task.fit_config.dataloader_config.batch_size:
     values: [16, 32, 64, 128]
 
@@ -30,5 +27,5 @@ command:
   - python
   - -m
   - ${program}
-  - --config-name=local_cifar_swat
+  - --config-name=cluster_cifar_powerprop
   - ${args_no_hyphens}
