@@ -4,6 +4,8 @@ TODO:
 
 from copy import deepcopy
 from typing import Union
+from matplotlib import pyplot as plt
+import numpy as np
 
 
 import torch
@@ -14,6 +16,7 @@ from torch.nn.modules.utils import _pair
 from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 from torch.types import _int, _size
+from project.fed.utils.utils import nonzeros_tensor, print_nonzeros_tensor
 
 from project.task.utils.drop import (
     drop_nhwc_send_th,
@@ -42,6 +45,11 @@ def convolution_backward(
         grad_in_th
     ) = grad_wt_th = stride_grad = padding_grad = dilation_grad = groups_grad = None
 
+    # print(f"[forward.conv] sparse_input: {print_nonzeros_tensor(sparse_input)} ")
+    # print(f"[forward.conv] sparse_weight: {print_nonzeros_tensor(sparse_weight)} ")
+    # the output is not sparsified
+    # print(f"[forward.conv] grad_output: {print_nonzeros_tensor(grad_output)} ")
+
     # Compute gradient w.r.t. input
     if ctx.needs_input_grad[0]:
         input_grad = conv2d_input(
@@ -53,6 +61,7 @@ def convolution_backward(
             conf["dilation"],
             conf["groups"],
         )
+        # print(f"[forward.conv] input_grad: {print_nonzeros_tensor(input_grad)} ")
 
     # Compute gradient w.r.t. weight
     if ctx.needs_input_grad[1]:
@@ -65,9 +74,12 @@ def convolution_backward(
             conf["dilation"],
             conf["groups"],
         )
+        # print(f"[forward.conv] weight_grad: {print_nonzeros_tensor(weight_grad)} ")
+
     # Compute gradient w.r.t. bias (works for every Conv2d shape)
     if bias is not None and ctx.needs_input_grad[2]:
         bias_grad = grad_output.sum(dim=(0, 2, 3))
+        print(f"[forward.conv] bias_grad: {print_nonzeros_tensor(bias_grad)} ")
 
     # print(f"[swat_conv2d_unstructured.backward] grad_output: {nonzeros_rate(grad_output)}")
     # print(f"[swat_conv2d_unstructured.backward] sparse_input: {nonzeros_rate(sparse_input)} ")#bias: {nonzeros_rate(bias)}")
@@ -196,6 +208,10 @@ class swat_conv2d(Function):
         dilation,
         groups,
     ):
+
+        # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
+        # print(f"[forward.conv] weight: {print_nonzeros_tensor(weight)} ")
+
         output = F.conv2d(
             input=input,
             weight=weight,
@@ -205,6 +221,8 @@ class swat_conv2d(Function):
             dilation=dilation,
             groups=groups,
         )
+
+        # the output is not sparsified, it make sense?
 
         # Sparsifying activations
         # /SWAT-code/cifar10-100-code/custom_layers/custom_conv.py, sparsify_activations
@@ -221,6 +239,10 @@ class swat_conv2d(Function):
             in_threshold = in_threshold_tensor.item()
         else:
             sparse_input = drop_threshold(input, in_threshold)
+
+        # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
+        # print(f"[forward.conv] output: {print_nonzeros_tensor(output)} ")
+        # print(f"[forward.conv] sparse_input: {print_nonzeros_tensor(sparse_input)} ")
 
         # print(f"[swat_conv2d_unstructured.forward] weight: {nonzeros_rate(weight)}")
         # print(f"[swat_conv2d_unstructured.forward] input: {nonzeros_rate(input)} sparse_input: {nonzeros_rate(sparse_input)}")
@@ -356,6 +378,8 @@ class SWATConv2D(nn.Module):
             powerprop_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )
+
+        # print(f"[forward.conv] weight: {print_nonzeros_tensor(powerprop_weight)} ")
 
         # Perform the forward pass
         output = self._call_swat_conv2d(

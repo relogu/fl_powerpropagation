@@ -294,7 +294,7 @@ def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet1
 def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
     alpha: float = 2
-    sparsity: float = 0.3
+    sparsity: float = 0.7
 
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
 

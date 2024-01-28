@@ -7,8 +7,10 @@ model_and_data: SWAT_RESNET
 train_structure: SWAT
 
 alpha: 1
-sparsity: 0.001
-pruning_type: unstructured
+sparsity: 0.7
+# pruning_type: unstructured
+# pruning_type: structured_channels
+pruning_type: structured_filter
 
 # Client fit config
 fit_config:

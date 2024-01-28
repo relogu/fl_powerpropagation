@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from torch import nn
 from torch.utils.data import DataLoader
 from project.client.client import ClientConfig
+from project.fed.utils.utils import print_nonzeros
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
 from project.task.default.train_test import (
@@ -72,6 +73,8 @@ def train(  # pylint: disable=too-many-arguments
     net.to(config.device)
     net.train()
 
+    print_nonzeros(net, "[main] Before training:")
+
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(
         net.parameters(),
@@ -98,6 +101,9 @@ def train(  # pylint: disable=too-many-arguments
             num_correct += (output.max(1)[1] == target).clone().detach().sum().item()
             loss.backward()
             optimizer.step()
+            print_nonzeros(net, "[main] After one round of training:")
+
+    print_nonzeros(net, "[main] After training:")
 
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(

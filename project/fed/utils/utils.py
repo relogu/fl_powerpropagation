@@ -378,12 +378,12 @@ def nonzeros_tensor(p: torch.tensor) -> tuple[int, int]:
 def print_nonzeros_tensor(p: torch.tensor, msg: str = "") -> float:
     """Print the count the rate of non-zero parameter in a tensor."""
     nz_count, total_params = nonzeros_tensor(p)
-    log(
-        logging.INFO,
-        f"{msg}       nonzeros ="
-        f" {nz_count:7}/{total_params:7} ({100 * nz_count / total_params:6.2f}%) |"
-        f" total_pruned = {total_params - nz_count:7} | shape = {p.shape}",
-    )
+    # log(
+    #     logging.INFO,
+    #     f"{msg}       nonzeros ="
+    #     f" {nz_count:7}/{total_params:7} ({100 * nz_count / total_params:6.2f}%) |"
+    #     f" total_pruned = {total_params - nz_count:7} | shape = {p.shape}",
+    # )
     return round((nz_count / total_params) * 100, 1)
 
 
