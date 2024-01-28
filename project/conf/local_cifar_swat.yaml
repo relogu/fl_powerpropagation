@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: local_cifar_swat
   - fed: local_cifar
-  - strategy: fedavg
+  - strategy: fedavgBZ
   - dataset: local_cifar_lda
 
 # If running the same experiment multiple times

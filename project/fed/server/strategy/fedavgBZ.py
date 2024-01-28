@@ -102,13 +102,11 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
 #     """Compute Bayesian aggregation for non-zero weights."""
 #     # Calculate the total number of examples used during training
 #     num_examples_total = sum([num_examples for _, num_examples in results])
-#
 #     # Create a list of weights, each multiplied by the related number of examples
 #     weighted_weights = [
 #         [(layer * num_examples, layer != 0) for layer in weights]
 #         for weights, num_examples in results
 #     ]
-#
 #     # Reset priors
 #     alphas = {
 #         k: np.ones_like(v) * lambda_init for k, v in weighted_weights[0][0][0].items()
@@ -116,7 +114,6 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
 #     betas = {
 #         k: np.ones_like(v) * lambda_init for k, v in weighted_weights[0][0][0].items()
 #     }
-#
 #     # Update priors and compute Bayesian aggregation
 #     weights_prime: NDArrays = []
 #     for layer_updates in zip(*weighted_weights):
@@ -127,12 +124,11 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
 #                     betas[k] += num_examples_total - v
 #                     avg_p = (alphas[k] - 1) / (alphas[k] + betas[k] - 2)
 #                     weights_prime.append(np.log(avg_p / (1 - avg_p)))
-#
 #     return weights_prime
 
 
 # pylint: disable=line-too-long
-class FedAvgNZ(Strategy):
+class FedAvgBZ(Strategy):
     """Federated Averaging strategy.
 
     Implementation based on https://arxiv.org/abs/1602.05629
@@ -237,18 +233,18 @@ class FedAvgNZ(Strategy):
         return initial_parameters
 
     # def evaluate(
-    #    self, server_round: int, parameters: Parameters
+    #     self, server_round: int, parameters: Parameters
     # ) -> Optional[tuple[float, dict[str, Scalar]]]:
-    #    """Evaluate model parameters using an evaluation function."""
-    #    if self.evaluate_fn is None:
-    #        # No evaluation function provided
-    #        return None
-    #    parameters_ndarrays = parameters_to_ndarrays(parameters)
-    #    eval_res = self.evaluate_fn(server_round, parameters_ndarrays, {})
-    #    if eval_res is None:
-    #        return None
-    #    loss, metrics = eval_res
-    #    return loss, metrics
+    #     """Evaluate model parameters using an evaluation function."""
+    #     if self.evaluate_fn is None:
+    #         # No evaluation function provided
+    #         return None
+    #     parameters_ndarrays = parameters_to_ndarrays(parameters)
+    #     eval_res = self.evaluate_fn(server_round, parameters_ndarrays, {})
+    #     if eval_res is None:
+    #         return None
+    #     loss, metrics = eval_res
+    #     return loss, metrics
 
     def configure_fit(
         self, server_round: int, parameters: Parameters, client_manager: ClientManager
