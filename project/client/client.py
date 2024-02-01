@@ -123,6 +123,8 @@ class Client(fl.client.NumPyClient):
 
         config.run_config["device"] = obtain_device()
 
+        # print(f"[client_{self.cid}] current_round: ", config.extra["curr_round"])
+
         # Check, from the config, if the mask has to be used
         if config.extra["mask"]:
             # mask_path = self.working_dir / f"mask_{self.cid}.npy"
@@ -138,8 +140,6 @@ class Client(fl.client.NumPyClient):
                 # Create noise, random sampling (1 - mask), for each layer's parameters
                 # np.random.normal(0, 1, param.shape) * (1 - m)
                 # np.random.rand(*param.shape) < 0.5 * (1 - m)
-                #
-
                 noise = [
                     np.random.rand(*param.shape) < config.extra["noise"] * (1 - m)
                     for param, m in zip(parameters, mask, strict=True)
@@ -216,8 +216,74 @@ class Client(fl.client.NumPyClient):
             config.dataloader_config,
         )
 
-        # print_nonzeros(self.net, f"[client_{self.cid}] Before training:")
+        # def update_learing_rate(
+        #         learning_rate: float,
+        #         final_learning_rate: float,
+        #         curr_round: int,
+        #         total_rounds: int = 100
+        #     ):
+        #     """Update the learning rate using the exponential decay."""
+        #     ratio = learning_rate / final_learning_rate
+        #     log_ratio = math.log(ratio)
+        #     exponential_term = (curr_round / total_rounds) * log_ratio
+        #     eta_t = learning_rate * math.exp(exponential_term)
+        #     return eta_t
 
+        # def interpolate_learning_rate(t, T, lr, LR):
+        def interpolate_learning_rate(
+            learning_rate: float,
+            final_learning_rate: float,
+            curr_round: int,
+            total_rounds: int = 50,
+        ) -> float:
+            """Update the learning rate using the linear interpolation."""
+            # if t > T:
+            #     return LR
+            # return lr + (LR - lr) * ((t - 1) / (T - 1))
+            if curr_round > total_rounds:
+                return final_learning_rate
+            return learning_rate + (final_learning_rate - learning_rate) * (
+                (curr_round - 1) / (total_rounds - 1)
+            )
+
+        config.run_config["learning_rate"] = interpolate_learning_rate(
+            learning_rate=config.run_config["learning_rate"],
+            final_learning_rate=config.run_config["final_learning_rate"],
+            curr_round=config.extra["curr_round"],
+            # total_rounds=config.extra["total_rounds"]
+        )
+
+        # _net = deepcopy(self.net)
+
+        def _changing_sparsity(net: nn.Module, sparsity: float) -> None:
+            """Change the sparsity of the SWAT layers."""
+            for module in net.modules():
+                if hasattr(module, "sparsity"):
+                    module.sparsity = sparsity
+
+        def _changing_alpha(net: nn.Module, alpha: float) -> None:
+            """Change the alpha of the SWAT layers."""
+            for module in net.modules():
+                if hasattr(module, "alpha"):
+                    module.alpha = alpha
+
+        # modify alpha for the first 5 rounds
+        if config.extra["curr_round"] < 0:
+            self.net.apply(lambda x: _changing_alpha(x, 1.0))
+
+        # modify alpha and sparsity evry 5 rounds
+        if config.extra["curr_round"] == 1:
+            self.net.apply(lambda x: _changing_alpha(x, 0.9))
+        # if config.extra["curr_round"] >= 5 and config.extra["curr_round"] < 13:
+        #     sparsity = 1 - (15 - config.extra["curr_round"]) / 10
+        #     print(f"[client_{self.cid}] Setting sparsity to: ", sparsity)
+        #     self.net.apply(lambda x: _changing_sparsity(x, sparsity))
+        else:
+            self.net.apply(lambda x: _changing_sparsity(x, 0.0))
+
+        print_nonzeros(self.net, f"[client_{self.cid}] Before training:")
+
+        # print(f"[client_{self.cid}] config.run_config: ", config.run_config)
         num_samples, metrics = self.train(
             self.net,
             trainloader,
@@ -225,7 +291,9 @@ class Client(fl.client.NumPyClient):
             self.working_dir,
         )
 
-        # print_nonzeros(self.net, f"[client_{self.cid}] After training:")
+        print_nonzeros(self.net, f"[client_{self.cid}] After training:")
+        # update_rate = net_compare(self.net, _net, "train")
+        # metrics["update_rate"] = update_rate
 
         trained_parameters = generic_get_parameters(self.net)
 
@@ -233,11 +301,11 @@ class Client(fl.client.NumPyClient):
         if config.extra["mask"]:
             # Estract the mask from the parameters
             # mask = trained_parameters != 0
-            mask = [param != 0 for param in parameters]
+            mask = [param != 0 for param in trained_parameters]
             # Save the mask in the output dir
             mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-            with open(mask_path, "wb") as f:
-                pickle.dump(mask, f)
+            with open(mask_path, "wb") as fw:
+                pickle.dump(mask, fw)
             # print(f"[clien_{self.cid}] Saving mask in: ", mask_path)
 
         return (
@@ -291,6 +359,10 @@ class Client(fl.client.NumPyClient):
             parameters,
             config.net_config,
         )
+        sparsity = print_nonzeros(
+            self.net, f"[client_{self.cid}] before first evaluation:"
+        )
+
         testloader = self.dataloader_gen(
             self.cid,
             True,
@@ -298,7 +370,6 @@ class Client(fl.client.NumPyClient):
         )
 
         # print the number of non zero elements in the net
-        print_nonzeros(self.net, f"[client_{self.cid}] Before evaluation:")
 
         loss, num_samples, metrics = self.test(
             self.net,
@@ -306,6 +377,36 @@ class Client(fl.client.NumPyClient):
             config.run_config,
             self.working_dir,
         )
+
+        # self.net = self.set_parameters(
+        #     parameters,
+        #     config.net_config,
+        # )
+        # def _changing_alpha(module: nn.Module, alpha: float) -> None:
+        #     """Change the alpha of the SWAT layers."""
+        #     for module in self.net.modules():
+        #         if hasattr(module, "alpha"):
+        #             module.alpha = alpha
+        # self.net.apply(lambda x: _changing_alpha(x, 1.0))
+        # def _changing_sparsity(module: nn.Module, sparsity: float) -> None:
+        #     """Change the sparsity of the SWAT layers."""
+        #     for module in self.net.modules():
+        #         if hasattr(module, "sparsity"):
+        #             module.sparsity = sparsity
+        # self.net.apply(lambda x: _changing_sparsity(x, 0.0))
+        # _loss, _num_samples, _metrics = self.test(
+        #     self.net,
+        #     testloader,
+        #     config.run_config,
+        #     self.working_dir,
+        # )
+        # metrics["noalpha_test_accuracy"] = _metrics["test_accuracy"]
+        # metrics["noalpha_loss"] = _loss
+
+        print_nonzeros(self.net, f"[client_{self.cid}] after second evaluation:")
+
+        metrics["sparsity"] = sparsity
+
         return loss, num_samples, metrics
 
     def get_parameters(self, config: dict) -> NDArrays:

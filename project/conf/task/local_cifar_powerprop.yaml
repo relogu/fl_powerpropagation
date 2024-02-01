@@ -2,13 +2,13 @@
 # These strings are constants used by the dispatcher to select functionality at runtime
 # Please implement all behaviour in the task-level dispatch.py file and then add the dispatch functions to the top-level dispatch.py
 # Choose the model and dataset
-model_and_data: POWERPROP_NEW
+model_and_data: RESNET_POWERPROP
 # model_and_data: CIFAR_SWAT
 # Choose the train, test and server fed_eval functions
-train_structure: CIFAR_NEW
+train_structure: CIFAR_POWERPROP
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
-alpha: 1.25
+alpha: 1.5
 
 # Client fit config
 fit_config:
@@ -16,11 +16,12 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 32
+    batch_size: 16
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1
-    learning_rate: 0.03
+    learning_rate: 0.1
+    final_learning_rate: 0.01
   # No extra config
   extra: {mask: false}
 
@@ -51,4 +52,4 @@ net_config_initial_parameters: {}
 
 # The names of metrics you wish to aggregate
 fit_metrics: [train_loss, train_accuracy]
-evaluate_metrics: [test_accuracy]
+evaluate_metrics: [test_accuracy, noalpha_loss, noalpha_test_accuracy]

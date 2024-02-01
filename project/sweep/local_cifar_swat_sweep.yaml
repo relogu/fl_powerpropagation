@@ -25,12 +25,16 @@ parameters:
   #   max: 10
   # task.fit_config.dataloader_config.batch_size:
   #   values: [16, 32, 64, 128]
+  task.fit_config.extra.mask:
+    values: [true, false]
+  task.fit_config.extra.noise:
+    values: [0.0, 0.1]
 
 early_terminate:
   type: hyperband
   s: 2
   eta: 3
-  max_iter: 100
+  max_iter: 40
 
 command:
   - poetry
@@ -40,3 +44,5 @@ command:
   - ${program}
   - --config-name=local_cifar_swat
   - ${args_no_hyphens}
+
+# poetry run wandb agent fl_powerprop/sweeptry/iivhkaac

@@ -71,9 +71,12 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "CIFAR_NEW":
+    if train_structure is not None and train_structure.upper() == "CIFAR_POWERPROP":
         return train, test, get_fed_eval_fn
-    elif train_structure is not None and train_structure.upper() == "CIFAR_PRUNE":
+    elif (
+        train_structure is not None
+        and train_structure.upper() == "CIFAR_POWERPROP_PRUNE"
+    ):
         sparsity = cfg.get("task", {}).get("sparsity", 0.5)
         return (
             get_train_and_prune(amount=sparsity, pruning_method="l1"),
@@ -128,7 +131,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         # for the provided partition dir
 
         # Case insensitive matches
-        if client_model_and_data.upper() == "POWERPROP_NEW":
+        if client_model_and_data.upper() == "RESNET_POWERPROP":
             (
                 client_dataloader_gen,
                 fed_dataloater_gen,
@@ -136,8 +139,9 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 Path(partition_dir),
             )
             alpha = cfg.get("task", {}).get("alpha", 4.0)
+            sparsity = cfg.get("task", {}).get("sparsity", 0.5)
             return (
-                get_network_generator_resnet_powerprop(alpha=alpha),
+                get_network_generator_resnet_powerprop(alpha=alpha, sparsity=sparsity),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

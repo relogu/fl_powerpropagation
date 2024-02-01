@@ -26,7 +26,12 @@ from project.task.cifar_swat.models import get_network_generator_resnet_swat
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar_swat.dataset import get_dataloader_generators
-from project.task.cifar_swat.train_test import get_fed_eval_fn, test, train
+from project.task.cifar_swat.train_test import (
+    get_fed_eval_fn,
+    get_train_and_prune,
+    test,
+    train,
+)
 from project.types.common import DataStructure, TrainStructure
 
 
@@ -61,9 +66,15 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "SWAT":
+    if train_structure is not None and train_structure.upper() == "CIFAR_SWAT":
         return train, test, get_fed_eval_fn
-
+    elif train_structure is not None and train_structure.upper() == "CIFAR_SWAT_PRUNE":
+        sparsity = cfg.get("task", {}).get("sparsity", 0.5)
+        return (
+            get_train_and_prune(amount=sparsity, pruning_method="l1"),
+            test,
+            get_fed_eval_fn,
+        )
     # Cannot match, send to next dispatch in chain
     return None
 
@@ -119,6 +130,10 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
 
         alpha: float = cfg.get("task", {}).get("alpha", 4)
         sparsity: float = cfg.get("task", {}).get("sparsity", 0.7)
+        # if the train structure is CIFAR_SWAT_PRUNE, than reduce the sparsity
+        if cfg.get("task", {}).get("train_structure", None) == "CIFAR_SWAT_PRUNE":
+            sparsity = 1 - (1 - sparsity) * 3
+
         pruning_type: str = cfg.get("task", {}).get("pruning_type", "unstructured")
 
         # Case insensitive matches

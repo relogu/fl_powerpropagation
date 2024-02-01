@@ -79,8 +79,7 @@ def convolution_backward(
     # Compute gradient w.r.t. bias (works for every Conv2d shape)
     if bias is not None and ctx.needs_input_grad[2]:
         bias_grad = grad_output.sum(dim=(0, 2, 3))
-        print(f"[forward.conv] bias_grad: {print_nonzeros_tensor(bias_grad)} ")
-
+        # print(f"[forward.conv] bias_grad: {print_nonzeros_tensor(bias_grad)} ")
     # print(f"[swat_conv2d_unstructured.backward] grad_output: {nonzeros_rate(grad_output)}")
     # print(f"[swat_conv2d_unstructured.backward] sparse_input: {nonzeros_rate(sparse_input)} ")#bias: {nonzeros_rate(bias)}")
     # print(f"[swat_conv2d_unstructured.backward] grad_input: {nonzeros_rate(input_grad)} grad_weight: {nonzeros_rate(weight_grad)}\n")#grad_bias: {nonzeros_rate(bias_grad)}\n")
@@ -102,23 +101,26 @@ def convolution_backward(
 class swat_linear(Function):
     @staticmethod
     def forward(ctx, input, weight, bias, sparsity):
-        sparse_weight = weight  # matrix_drop(weight, 1 - sparsity)
+        # sparse_weight = weight  # matrix_drop(weight, 1 - sparsity)
 
         if input.dim() == 2 and bias is not None:
             # The fused op is marginally faster
-            output = torch.addmm(bias, input, sparse_weight.t())
+            output = torch.addmm(bias, input, weight.t())
         else:
-            output = input.matmul(sparse_weight.t())
+            output = input.matmul(weight.t())
             if bias is not None:
                 output += bias
 
-        sparse_input = matrix_drop(input, 1 - sparsity)
+        if sparsity != 0.0:
+            sparse_input = matrix_drop(input, 1 - sparsity)
+        else:
+            sparse_input = input
 
         # print(f"[swat_linear.forward] weight: {nonzeros_rate(weight)} sparse_weight: {nonzeros_rate(sparse_weight)}")
         # print(f"[swat_linear.forward] input: {nonzeros_rate(input)} sparse_input: {nonzeros_rate(sparse_input)}")
         # print(f"[swat_linear.forward] output: {nonzeros_rate(output)}\n")
 
-        ctx.save_for_backward(sparse_input, sparse_weight, bias)
+        ctx.save_for_backward(sparse_input, weight, bias)
         return output
 
     @staticmethod
@@ -133,6 +135,22 @@ class swat_linear(Function):
             grad_weight = grad_output.t().mm(sparse_input)
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum(0)
+
+        # print(
+        #     "[backward.swat_linear] sparse_input:"
+        #     f" {print_nonzeros_tensor(sparse_input)} "
+        # )
+        # print(
+        #     "[backward.swat_linear] sparse_weight:"
+        #     f" {print_nonzeros_tensor(sparse_weight)} "
+        # )
+        # print(
+        #     f"[backward.swat_linear] grad_input: {print_nonzeros_tensor(grad_input)} "
+        # )
+        # print(
+        #     f"[backward.swat_linear] grad_weight: {print_nonzeros_tensor(grad_weight)} "
+        # )
+        # print("\n")
 
         # print(f"[swat_linear.backward] grad_output: {nonzeros_rate(grad_output)}")#grad_bias: {nonzeros_rate(grad_bias)}\n")
         # print(f"[swat_linear.backward] sparse_input: {nonzeros_rate(sparse_input)} sparse_weight: {nonzeros_rate(sparse_weight)} ")#bias: {nonzeros_rate(bias)}")
@@ -176,7 +194,8 @@ class SWATLinear(nn.Module):
         return swat_linear.apply(input, weight, self.bias, self.sparsity)
 
     def forward(self, input):
-        self.weight.data = matrix_drop(self.weight, self.sparsity)
+        if self.sparsity != 0.0:
+            self.weight.data = matrix_drop(self.weight, 1 - self.sparsity)
 
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha == 1.0:
@@ -234,11 +253,16 @@ class swat_conv2d(Function):
         # Just in case you want to copute the threshold every time, add the following line
         # in_threshold = torch.tensor(-1.0) ?
 
-        if in_threshold < 0.0:
-            sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, 1 - sparsity)
-            in_threshold = in_threshold_tensor.item()
+        if sparsity != 0.0:
+            if in_threshold < 0.0:
+                sparse_input, in_threshold_tensor = drop_nhwc_send_th(
+                    input, 1 - sparsity
+                )
+                in_threshold = in_threshold_tensor.item()
+            else:
+                sparse_input = drop_threshold(input, in_threshold)
         else:
-            sparse_input = drop_threshold(input, in_threshold)
+            sparse_input = input
 
         # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
         # print(f"[forward.conv] output: {print_nonzeros_tensor(output)} ")
@@ -352,25 +376,33 @@ class SWATConv2D(nn.Module):
 
     def forward(self, input):
         # sparsify weights
-        if self.pruning_type == "unstructured":
-            if self.wt_threshold < 0.0:
-                # Here you have to compute the threshold
-                self.weight.data, wt_threshold_tensor = drop_nhwc_send_th(
-                    self.weight, 1 - self.sparsity
-                )
-                self.wt_threshold = wt_threshold_tensor.item()
+        # if not self.training:
+        # print(f"[forward.conv] self.sparsity: {self.sparsity}")
+        # print(f"[forward.conv] self.alpha: {self.alpha} ")
+        if self.sparsity != 0.0:
+            top_k = 1 - self.sparsity
+            if self.pruning_type == "unstructured":
+                self.wt_threshold = -1.0
+                if self.wt_threshold < 0.0:
+                    # Here you have to compute the threshold
+                    self.weight.data, wt_threshold_tensor = drop_nhwc_send_th(
+                        self.weight, top_k
+                    )
+                    self.wt_threshold = wt_threshold_tensor.item()
+                else:
+                    # You already have the threshold
+                    self.weight.data = drop_threshold(self.weight, self.wt_threshold)
+                    # wt_threshold = self.wt_threshold
+            elif self.pruning_type == "structured_channel":
+                self.weight.data = drop_structured(self.weight, top_k)
+            elif self.pruning_type == "structured_filter":
+                self.weight.data = drop_structured_filter(self.weight, top_k)
             else:
-                # You already have the threshold
-                self.weight.data = drop_threshold(self.weight, self.wt_threshold)
-                # wt_threshold = self.wt_threshold
-        elif self.pruning_type == "structured_channel":
-            self.weight.data = drop_structured(self.weight, 1 - self.sparsity)
-        elif self.pruning_type == "structured_filter":
-            self.weight.data = drop_structured_filter(self.weight, 1 - self.sparsity)
-        else:
-            assert 0, "Illegal Pruning Type"
+                assert 0, "Illegal Pruning Type"
 
+        # if self.training:
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
+
         if self.alpha == 1.0:
             powerprop_weight = self.weight
         else:
@@ -379,13 +411,34 @@ class SWATConv2D(nn.Module):
                 torch.abs(self.weight), self.alpha
             )
 
-        # print(f"[forward.conv] weight: {print_nonzeros_tensor(powerprop_weight)} ")
-
+        # print(f"[forward.conv] powerprop_weight: {print_nonzeros_tensor(powerprop_weight)} ")
         # Perform the forward pass
         output = self._call_swat_conv2d(
             input,
             powerprop_weight,
         )
+
+        # print(f"[forward.conv] before self.weight: {print_nonzeros_tensor(self.weight)} ")
+        # if self.sparsity != 0.0:
+        #     if self.pruning_type == "unstructured":
+        #         self.wt_threshold = -1.0
+        #         if self.wt_threshold < 0.0:
+        #             # Here you have to compute the threshold
+        #             self.weight.data, wt_threshold_tensor = drop_nhwc_send_th(
+        #                 self.weight, 1 - self.sparsity
+        #             )
+        #             self.wt_threshold = wt_threshold_tensor.item()
+        #         else:
+        #             # You already have the threshold
+        #             self.weight.data = drop_threshold(self.weight, self.wt_threshold)
+        #             # wt_threshold = self.wt_threshold
+        #     elif self.pruning_type == "structured_channel":
+        #         self.weight.data = drop_structured(self.weight, 1 - self.sparsity)
+        #     elif self.pruning_type == "structured_filter":
+        #         self.weight.data = drop_structured_filter(self.weight, 1 - self.sparsity)
+        #     else:
+        #         assert 0, "Illegal Pruning Type"
+        # print(f"[forward.conv] abter self.weight: {print_nonzeros_tensor(self.weight)} ")
 
         # Return the output
         return output

@@ -131,6 +131,8 @@ class WandbServer(Server):
                 ) = res_fit  # fit_metrics_aggregated
                 if parameters_prime:
                     self.parameters = parameters_prime
+                    # try to check the parameters sparsity here
+
                 history.add_metrics_distributed_fit(
                     server_round=current_round,
                     metrics=fit_metrics,
@@ -174,10 +176,12 @@ class WandbServer(Server):
                         server_round=current_round,
                         loss=loss_fed,
                     )
+                    # print(evaluate_metrics_fed["noalpha_test_accuracy"])
                     history.add_metrics_distributed(
                         server_round=current_round,
                         metrics=evaluate_metrics_fed,
                     )
+
             # Saver round parameters and files
             self.save_parameters_to_file(self.parameters)
             self.save_files_per_round(current_round)

@@ -141,6 +141,7 @@ def replace_layer_with_powerprop(
     module: nn.Module,
     name: str = "Model",  # ? Never used. Give some problem
     alpha: float = 4.0,
+    sparsity: float = 0.0,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
     for attr_str in dir(module):
@@ -148,6 +149,7 @@ def replace_layer_with_powerprop(
         if type(target_attr) == nn.Conv2d:
             new_conv = PowerPropConv2D(
                 alpha=alpha,
+                sparsity=sparsity,
                 in_channels=target_attr.in_channels,
                 out_channels=target_attr.out_channels,
                 kernel_size=target_attr.kernel_size[0],
@@ -159,6 +161,7 @@ def replace_layer_with_powerprop(
         if type(target_attr) == nn.Linear:
             new_conv = PowerPropLinear(
                 alpha=alpha,
+                sparsity=sparsity,
                 in_features=target_attr.in_features,
                 out_features=target_attr.out_features,
                 bias=target_attr.bias is not None,
@@ -167,7 +170,7 @@ def replace_layer_with_powerprop(
 
     # ? for name, immediate_child_module in module.named_children(): # Previus version
     for model, immediate_child_module in module.named_children():
-        replace_layer_with_powerprop(immediate_child_module, model, alpha)
+        replace_layer_with_powerprop(immediate_child_module, model, alpha, sparsity)
 
 
 def init_model(
@@ -181,6 +184,7 @@ def init_model(
 
 def get_network_generator_resnet_powerprop(
     alpha: float = 4.0,
+    sparsity: float = 0.0,
 ) -> Callable[[dict], NetCifarResnet18]:
     """Powerprop Resnet generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
@@ -188,6 +192,7 @@ def get_network_generator_resnet_powerprop(
         module=untrained_net,
         name="NetCifarResnet18",
         alpha=alpha,
+        sparsity=sparsity,
     )
 
     init_model(untrained_net)
@@ -200,6 +205,7 @@ def get_network_generator_resnet_powerprop(
 
 def get_parameters_to_prune(
     net: nn.Module,
+    first_layer: bool = False,
 ) -> Iterable[tuple[nn.Module, str, str]]:
     """Pruning.
 
@@ -207,13 +213,12 @@ def get_parameters_to_prune(
     model.
     """
     parameters_to_prune = []
-    first_layer = True
 
     def add_immediate_child(
         module: nn.Module,
         name: str,
+        first_layer: bool = True,
     ) -> None:
-        nonlocal first_layer
         if (
             type(module) == PowerPropConv2D
             or type(module) == PowerPropLinear
@@ -222,12 +227,13 @@ def get_parameters_to_prune(
         ):
             if first_layer:
                 first_layer = False
+            # elif module.sparsity != 0.0:
             else:
                 parameters_to_prune.append((module, "weight", name))
 
         for _name, immediate_child_module in module.named_children():
-            add_immediate_child(immediate_child_module, _name)
+            add_immediate_child(immediate_child_module, _name, first_layer)
 
-    add_immediate_child(net, "Net")
+    add_immediate_child(net, "Net", first_layer=first_layer)
 
     return parameters_to_prune

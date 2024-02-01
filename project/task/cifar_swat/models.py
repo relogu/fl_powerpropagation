@@ -1,5 +1,6 @@
 """CNN model architecture, training, and testing functions for MNIST."""
 
+from collections.abc import Iterable
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -147,7 +148,6 @@ def replace_layer_with_swat(
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
     for attr_str in dir(module):
         # Skip the first layer, as in SWAT-U
-        # ? if skip_first and attr_str in ["conv1", "0"]: continue
 
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:
@@ -168,6 +168,9 @@ def replace_layer_with_swat(
             )
             setattr(module, attr_str, new_conv)
         if type(target_attr) == nn.Linear:
+            if skip_first:  # and attr_str in ["conv1", "0"]:
+                skip_first = False
+                continue
             new_conv = SWATLinear(
                 alpha=alpha,
                 in_features=target_attr.in_features,
@@ -179,8 +182,43 @@ def replace_layer_with_swat(
 
     for model, immediate_child_module in module.named_children():
         replace_layer_with_swat(
-            immediate_child_module, model, alpha, sparsity, skip_first=False
+            immediate_child_module, model, alpha, sparsity, skip_first=skip_first
         )
+
+
+def get_parameters_to_prune(
+    net: nn.Module,
+) -> Iterable[tuple[nn.Module, str, str]]:
+    """Pruning.
+
+    Return an iterable of tuples containing the PowerPropConv2D layers in the input
+    model.
+    """
+    parameters_to_prune = []
+    first_layer = True
+
+    def add_immediate_child(
+        module: nn.Module,
+        name: str,
+    ) -> None:
+        nonlocal first_layer
+        if (
+            type(module) == SWATConv2D
+            or type(module) == SWATLinear
+            or type(module) == nn.Conv2d
+            or type(module) == nn.Linear
+        ):
+            if first_layer:
+                first_layer = False
+            else:
+                parameters_to_prune.append((module, "weight", name))
+
+        for _name, immediate_child_module in module.named_children():
+            add_immediate_child(immediate_child_module, _name)
+
+    add_immediate_child(net, "Net")
+
+    return parameters_to_prune
 
 
 def get_network_generator_resnet_swat(

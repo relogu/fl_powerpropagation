@@ -335,7 +335,7 @@ def test_client(
                 )
 
 
-def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> None:
+def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> float:
     """Count the rate of different parameter between two network."""
     device = torch.device(
         "cuda:0" if torch.cuda.is_available() else "cpu",
@@ -363,8 +363,9 @@ def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> None:
         logging.INFO,
         f"[{msg}] Modified: {nz_count:7}, Equal: {total_params - nz_count:7}, total:"
         f" {total_params:7},"
-        f" ({100 - 100 * (total_params - nz_count) / total_params:6.2f}% Modified)",
+        f" ({(nz_count / total_params) * 100:6.2f}% Modified)",
     )
+    return round((nz_count / total_params) * 100, 1)
 
 
 def nonzeros_tensor(p: torch.tensor) -> tuple[int, int]:

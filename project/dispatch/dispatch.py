@@ -83,11 +83,11 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
     """
     # Create the list of task dispatches to try
     task_train_functions: list[Callable[[DictConfig], TrainStructure | None]] = [
+        dispatch_cifar_swat_train,
         dispatch_default_train,
         dispatch_mnist_train,
         dispatch_cifar_train,
         dispatch_cifar_powerprop_train,
-        dispatch_cifar_swat_train,
         dispatch_resnet18_train,
     ]
 

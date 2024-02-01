@@ -4,7 +4,7 @@ defaults:
   - task: local_cifar_resnet18
   - fed: local_cifar
   - strategy: fedavg
-  - dataset: local_cifar_iid
+  - dataset: local_cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -35,7 +35,7 @@ use_wandb: true
 # Test without Ray to to enable easy error detection
 test_clients:
   all: false
-  one: false
+  one: true
 
 # Wandb configuration
 # add whatever tags you like

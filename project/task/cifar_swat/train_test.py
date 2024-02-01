@@ -3,10 +3,19 @@
 from collections.abc import Sized
 from pathlib import Path
 from typing import cast
+from collections.abc import Callable
+
+import logging
+from logging import ERROR
+from flwr.common import log
+from project.task.cifar_swat.models import (
+    get_parameters_to_prune,
+)
 
 import torch
 from pydantic import BaseModel
 from torch import nn
+from torch.nn.utils import prune
 from torch.utils.data import DataLoader
 from project.client.client import ClientConfig
 from project.fed.utils.utils import print_nonzeros
@@ -30,6 +39,7 @@ class TrainConfig(BaseModel):
     device: torch.device
     epochs: int
     learning_rate: float
+    # final_learning_rate: float # ? to remove
 
     class Config:
         """Setting to allow any types, including library ones like torch.device."""
@@ -73,13 +83,13 @@ def train(  # pylint: disable=too-many-arguments
     net.to(config.device)
     net.train()
 
-    print_nonzeros(net, "[main] Before training:")
+    # _net = deepcopy(net)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.0005,  # swat:0.0005 previus:0.001 ?
+        # weight_decay=0.0005,  # swat:0.0005 previus:0.001 ?
     )
 
     final_epoch_per_sample_loss = 0.0
@@ -101,9 +111,10 @@ def train(  # pylint: disable=too-many-arguments
             num_correct += (output.max(1)[1] == target).clone().detach().sum().item()
             loss.backward()
             optimizer.step()
-            print_nonzeros(net, "[main] After one round of training:")
+            # print_nonzeros(net, "[main] After one round of training:")
 
-    print_nonzeros(net, "[main] After training:")
+    # print_nonzeros(net, "[main] After training:")
+    # net_compare(net, _net, "train")
 
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
@@ -167,6 +178,8 @@ def test(
     criterion = nn.CrossEntropyLoss()
     correct, per_sample_loss = 0, 0.0
 
+    # print("Hi Alex, I am in test function")
+
     with torch.no_grad():
         for images, labels in testloader:
             images, labels = (
@@ -229,6 +242,56 @@ def get_on_fit_config_fn(fit_config: dict) -> OnFitConfigFN:
         return fit_config
 
     return fit_config_fn
+
+
+def get_train_and_prune(
+    amount: float = 0.3, pruning_method: str = "base"
+) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
+    """Return the training loop with one step pruning at the end.
+
+    Think about moving 'amount' to the config file
+    """
+    if pruning_method == "base":  # ? not working
+        pruning_method = prune.BasePruningMethod
+    elif pruning_method == "l1":
+        pruning_method = prune.L1Unstructured
+    else:
+        log(ERROR, f"Pruning method {pruning_method} not recognised, using base")
+
+    def train_and_prune(
+        net: nn.Module,
+        trainloader: DataLoader,
+        _config: dict,
+        _working_dir: Path,
+    ) -> tuple[int, dict]:
+        """Training and pruning process."""
+        log(logging.DEBUG, "Start training")
+
+        parameters_to_prune = get_parameters_to_prune(net)
+
+        print_nonzeros(net, "[train_and_prune] Before trainig:")
+        metrics = train(
+            net=net,
+            trainloader=trainloader,
+            _config=_config,
+            _working_dir=_working_dir,
+        )
+
+        print_nonzeros(net, "[train_and_prune] After training:")
+        prune.global_unstructured(
+            parameters=[
+                (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+            ],
+            pruning_method=pruning_method,
+            amount=amount,
+        )
+
+        for module, name, _ in parameters_to_prune:
+            prune.remove(module, name)
+        print_nonzeros(net, "[train_and_prune] After pruning:")
+        return metrics
+
+    return train_and_prune
 
 
 get_fed_eval_fn = get_default_fed_eval_fn

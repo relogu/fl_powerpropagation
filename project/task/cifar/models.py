@@ -145,6 +145,7 @@ def replace_layer_with_powerprop(
     module: nn.Module,
     name: str = "Model",  # ? Never used. Give some problem
     alpha: float = 2.0,
+    sparsity: float = 0.5,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
     for attr_str in dir(module):
@@ -152,6 +153,7 @@ def replace_layer_with_powerprop(
         if type(target_attr) == nn.Conv2d:
             new_conv = PowerPropConv2D(
                 alpha=alpha,
+                sparsity=sparsity,
                 in_channels=target_attr.in_channels,
                 out_channels=target_attr.out_channels,
                 kernel_size=target_attr.kernel_size[0],
@@ -163,6 +165,7 @@ def replace_layer_with_powerprop(
         if type(target_attr) == nn.Linear:
             new_conv = PowerPropLinear(
                 alpha=alpha,
+                sparsity=sparsity,
                 in_features=target_attr.in_features,
                 out_features=target_attr.out_features,
                 bias=target_attr.bias is not None,

@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: local_cifar_swat
   - fed: local_cifar
-  - strategy: fedavgBZ
+  - strategy: fedavg
   - dataset: local_cifar_lda
 
 # If running the same experiment multiple times
@@ -35,7 +35,7 @@ use_wandb: true
 # Test without Ray to enable easy error detection
 test_clients:
   all: false
-  one: true
+  one: false
 
 # Wandb configuration
 # add whatever tags you like

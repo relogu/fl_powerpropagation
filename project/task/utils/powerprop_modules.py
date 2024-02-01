@@ -20,12 +20,14 @@ class PowerPropLinear(nn.Module):
     def __init__(
         self,
         alpha: float,
+        sparsity: float,
         in_features: int,
         out_features: int,
         bias: bool = True,
     ):
         super(PowerPropLinear, self).__init__()
         self.alpha = alpha
+        self.sparsity = sparsity
         self.in_features = in_features
         self.out_features = out_features
         self.b = bias
@@ -34,7 +36,8 @@ class PowerPropLinear(nn.Module):
 
     def __repr__(self):
         return (
-            f"PowerPropLinear(alpha={self.alpha}, in_features={self.in_features},"
+            f"PowerPropLinear(alpha={self.alpha}, sparsity={self.sparsity},"
+            f" in_features={self.in_features},"
             f" out_features={self.out_features}, bias={self.b})"
         )
 
@@ -60,6 +63,7 @@ class PowerPropConv2D(nn.Module):
     def __init__(
         self,
         alpha: float,
+        sparsity: float,
         in_channels: int,
         out_channels: int,
         kernel_size: int = 3,
@@ -71,6 +75,7 @@ class PowerPropConv2D(nn.Module):
     ):
         super(PowerPropConv2D, self).__init__()
         self.alpha = alpha
+        self.sparsity = sparsity
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -86,7 +91,8 @@ class PowerPropConv2D(nn.Module):
 
     def __repr__(self):
         return (
-            f"PowerPropConv2D(alpha={self.alpha}, in_channels={self.in_channels},"
+            f"PowerPropConv2D(alpha={self.alpha}, sparsity={self.sparsity},"
+            f" in_channels={self.in_channels},"
             f" out_channels={self.out_channels}, kernel_size={self.kernel_size},"
             f" bias={self.b}, stride={self.stride}, padding={self.padding},"
             f" dilation={self.dilation}, groups={self.groups})"

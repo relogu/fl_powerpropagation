@@ -4,7 +4,7 @@
 # Choose the model and dataset
 model_and_data: SWAT_RESNET
 # Choose the train, test and server fed_eval functions
-train_structure: SWAT
+train_structure: CIFAR_SWAT
 
 # Add something like swat_config:
 alpha: 1

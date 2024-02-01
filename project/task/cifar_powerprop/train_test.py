@@ -138,7 +138,7 @@ def get_train_and_prune(
         """Training and pruning process."""
         log(logging.DEBUG, "Start training")
 
-        parameters_to_prune = get_parameters_to_prune(net)
+        # parameters_to_prune = get_parameters_to_prune(net)
 
         metrics = train(
             net=net,
@@ -147,16 +147,28 @@ def get_train_and_prune(
             _working_dir=_working_dir,
         )
 
-        prune.global_unstructured(
-            parameters=[
-                (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
-            ],
-            pruning_method=pruning_method,
-            amount=amount,
-        )
+        # get the amount of parameters to prune from the first module that has sparsity
+        def get_amount(net: nn.Module) -> float:
+            for module in net.modules():
+                if hasattr(module, "sparsity"):
+                    return module.sparsity
+            return 0.0
 
-        for module, name, _ in parameters_to_prune:
-            prune.remove(module, name)
+        amount = get_amount(net)
+        # print(f"[train_and_prune] amount: {amount}")
+        no_pruning = 0.0
+        if amount != no_pruning:
+            parameters_to_prune = get_parameters_to_prune(net)
+            prune.global_unstructured(
+                parameters=[
+                    (module, tensor_name)
+                    for module, tensor_name, _ in parameters_to_prune
+                ],
+                pruning_method=pruning_method,
+                amount=amount,
+            )
+            for module, name, _ in parameters_to_prune:
+                prune.remove(module, name)
 
         return metrics
 

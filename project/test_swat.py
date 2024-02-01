@@ -14,9 +14,9 @@ from flwr.common import log
 
 import hydra
 from project.fed.utils.plot_utils import plot_abs_parameter_distribution
-from project.task.cifar.dataset import get_dataloader_generators
-from project.task.cifar.models import get_network_generator_resnet_swat
-from project.task.cifar.train_test import train
+from project.task.cifar_swat.dataset import get_dataloader_generators
+from project.task.cifar_swat.models import get_network_generator_resnet_swat
+from project.task.cifar_swat.train_test import train
 
 from omegaconf import DictConfig
 
@@ -41,7 +41,7 @@ os.environ["RAY_MEMORY_MONITOR_REFRESH_MS"] = "0"
 
 @hydra.main(
     config_path="conf",
-    config_name="base",
+    config_name="local_cifar_swat",
     version_base=None,
 )
 def main(cfg: DictConfig) -> None:
@@ -57,9 +57,15 @@ def main(cfg: DictConfig) -> None:
     log(logging.INFO, f"[main-swat] config:{config}")
 
     # Create the model
-    get_resnet_swat: NetGen = get_network_generator_resnet_swat()
+    alpha = 1.0
+    sparsity = 0.7
+    pruning_type = "unstructured"
+    get_resnet_swat: NetGen = get_network_generator_resnet_swat(
+        alpha=alpha, sparsity=sparsity, pruning_type=pruning_type
+    )
     fake_config = dict([[], []])
     net = get_resnet_swat(fake_config)
+    # net = get_resnet_swat(None)
     net.load_state_dict(generate_random_state_dict(net, seed=42, sparsity=sparsity))
     net.to(device)
     # Create a copy to check the difference after the training
@@ -73,7 +79,7 @@ def main(cfg: DictConfig) -> None:
     # train_swat_test(net=model, _config=config, input=input, target=target)
 
     # Full training
-    get_dataloader, _ = get_dataloader_generators(Path("data/cifar/partition"))
+    get_dataloader, _ = get_dataloader_generators(Path("data/cifar/lda_1000"))
     data = get_dataloader(0, False, config)
     start_time = time.time()
 

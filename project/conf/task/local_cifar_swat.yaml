@@ -4,13 +4,13 @@
 # Choose the model and dataset
 model_and_data: SWAT_RESNET
 # Choose the train, test and server fed_eval functions
-train_structure: SWAT
+train_structure: CIFAR_SWAT
 
-alpha: 1
-sparsity: 0.7
+alpha: 2
+sparsity: 0.9
 # pruning_type: unstructured
 # pruning_type: structured_channels
-pruning_type: structured_filter
+pruning_type: unstructured
 
 # Client fit config
 fit_config:
@@ -18,13 +18,14 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 32  # 170
+    batch_size: 16  # 170
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1
-    learning_rate: 0.03
+    learning_rate: 0.1
+    final_learning_rate: 0.01
   # No extra config
-  extra: {mask: true}
+  extra: {mask: false, noise: 0.1}
 
 # Client eval config
 eval_config:
@@ -34,7 +35,7 @@ eval_config:
     batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {mask: true}
+  extra: {mask: false}
 
 # Configuration for the federated testing function
 # Follows the same conventions as the client config
@@ -52,5 +53,13 @@ fed_test_config:
 net_config_initial_parameters: {}
 
 # The names of metrics you wish to aggregate
-fit_metrics: [train_loss, train_accuracy]
-evaluate_metrics: [test_accuracy]
+fit_metrics:
+  - train_loss
+  - train_accuracy
+  # - update_rate
+
+evaluate_metrics:
+  - test_accuracy
+  # - noalpha_loss
+  # - noalpha_test_accuracy
+  - sparsity
