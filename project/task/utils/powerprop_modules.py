@@ -43,13 +43,20 @@ class PowerPropLinear(nn.Module):
 
     def get_weight(self):
         weight = self.weight.detach()
+        if self.alpha == 1.0:
+            return weight
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
         # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
-        weight = torch.sign(self.weight) * torch.pow(torch.abs(self.weight), self.alpha)
+        if self.alpha == 1.0:
+            weight = self.weight
+        else:
+            weight = torch.sign(self.weight) * torch.pow(
+                torch.abs(self.weight), self.alpha
+            )
         # Apply a mask, if given
         if mask is not None:
             weight *= mask
@@ -100,13 +107,20 @@ class PowerPropConv2D(nn.Module):
 
     def get_weights(self):
         weights = self.weight.detach()
+        if self.alpha == 1.0:
+            return weights
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
         # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
-        weight = torch.sign(self.weight) * torch.pow(torch.abs(self.weight), self.alpha)
+        if self.alpha == 1.0:
+            weight = self.weight
+        else:
+            weight = torch.sign(self.weight) * torch.pow(
+                torch.abs(self.weight), self.alpha
+            )
         # Apply a mask, if given
         if mask is not None:
             weight *= mask

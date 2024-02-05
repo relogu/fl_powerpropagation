@@ -1,4 +1,4 @@
-"""CNN model architecture, training, and testing functions for MNIST."""
+"""SWAT model architecture, training, and testing functions for CIFAR."""
 
 from collections.abc import Iterable
 import torch
@@ -8,15 +8,20 @@ import numpy as np
 
 from copy import deepcopy
 from collections.abc import Callable
+from project.fed.utils.utils import generate_random_state_dict
+from project.task.cifar_resnet18.models import (
+    NetCifarResnet18,
+    calculate_fan_in,
+    get_resnet18,
+)
 
 from project.types.common import NetGen
 from project.utils.utils import lazy_config_wrapper
 
 
 from project.task.utils.swat_modules import SWATConv2D, SWATLinear
-from torchvision.models import resnet18
 
-
+'''
 class Net(nn.Module):
     """Simple CNN adapted from 'PyTorch: A 60 Minute Blitz."""
 
@@ -68,8 +73,8 @@ class NetCifarResnet18(nn.Module):
         self.num_classes = num_classes
         self.device = device
         # As the LEAF people do
-        self.net = resnet18(num_classes=10, norm_layer=lambda x: nn.GroupNorm(2, x))
-        # self.net = resnet18(num_classes=self.num_classes)
+        # self.net = resnet18(num_classes=10, norm_layer=lambda x: nn.GroupNorm(2, x))
+        self.net = resnet18(num_classes=self.num_classes)
         # replace w/ smaller input layer
         self.net.conv1 = nn.Conv2d(
             3, 64, kernel_size=3, stride=1, padding=1, bias=False
@@ -83,7 +88,7 @@ class NetCifarResnet18(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass."""
         return self.net(x)
-
+'''
 
 get_resnet: NetGen = lazy_config_wrapper(NetCifarResnet18)
 
@@ -94,6 +99,7 @@ def init_weights(module: nn.Module) -> None:
         module,
         SWATLinear | SWATConv2D | nn.Linear | nn.Conv2d,
     ):
+        # print(f"init_weights: {type(module)}")
         # Your code here
         fan_in = calculate_fan_in(module.weight.data)
 
@@ -104,9 +110,12 @@ def init_weights(module: nn.Module) -> None:
         a, b = -2.0 * std, 2.0 * std
 
         u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
-        if isinstance(
-            module,
-            SWATLinear | SWATConv2D,
+        if (
+            isinstance(
+                module,
+                SWATLinear | SWATConv2D,
+            )
+            and module.alpha != 1
         ):
             u = torch.sign(u) * torch.pow(torch.abs(u), 1.0 / module.alpha)
 
@@ -115,40 +124,33 @@ def init_weights(module: nn.Module) -> None:
             module.bias.data.zero_()
 
 
-def calculate_fan_in(tensor: torch.Tensor) -> float:
-    """Calculate fan in.
+def new_init_weights(module: nn.Module) -> None:
+    """Initialize weights for linear and convolutional layers."""
+    if isinstance(
+        module,
+        SWATLinear | SWATConv2D | nn.Linear | nn.Conv2d,
+    ):
+        fan_in = calculate_fan_in(module.weight.data)
+        fan_out = module.weight.data.size(0)
+        if isinstance(module, nn.Conv2d | SWATConv2D):
+            receptive_field_size = np.prod(module.kernel_size) * module.in_channels
+            fan_out *= receptive_field_size
 
-    Modified from: https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py
-    """
-    min_fan_in = 2
-    dimensions = tensor.dim()
-    if dimensions < min_fan_in:
-        raise ValueError(
-            "Fan in can not be computed for tensor with fewer than 2 dimensions"
-        )
-
-    num_input_fmaps = tensor.size(1)
-    receptive_field_size = 1
-    if dimensions > min_fan_in:
-        for s in tensor.shape[2:]:
-            receptive_field_size *= s
-    fan_in = num_input_fmaps * receptive_field_size
-
-    return float(fan_in)
+        std = np.sqrt(2.0 / (fan_in + fan_out))  # Xavier initialization
+        nn.init.normal_(module.weight.data, 0, std)
+        if module.bias is not None:
+            nn.init.constant_(module.bias.data, 0)
 
 
 def replace_layer_with_swat(
     module: nn.Module,
     name: str = "Model",
-    alpha: float = 2.0,
-    sparsity: float = 0.3,
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
     pruning_type: str = "unstructured",
-    skip_first: bool = True,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
     for attr_str in dir(module):
-        # Skip the first layer, as in SWAT-U
-
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:
             new_conv = SWATConv2D(
@@ -161,16 +163,11 @@ def replace_layer_with_swat(
                 stride=target_attr.stride,
                 sparsity=sparsity,
                 pruning_type=pruning_type,
-                # pruning_type="structured_channel",
-                # pruning_type="structured_filter",
                 warm_up=0,
                 period=1,
             )
             setattr(module, attr_str, new_conv)
         if type(target_attr) == nn.Linear:
-            if skip_first:  # and attr_str in ["conv1", "0"]:
-                skip_first = False
-                continue
             new_conv = SWATLinear(
                 alpha=alpha,
                 in_features=target_attr.in_features,
@@ -181,9 +178,7 @@ def replace_layer_with_swat(
             setattr(module, attr_str, new_conv)
 
     for model, immediate_child_module in module.named_children():
-        replace_layer_with_swat(
-            immediate_child_module, model, alpha, sparsity, skip_first=skip_first
-        )
+        replace_layer_with_swat(immediate_child_module, model, alpha, sparsity)
 
 
 def get_parameters_to_prune(
@@ -222,11 +217,13 @@ def get_parameters_to_prune(
 
 
 def get_network_generator_resnet_swat(
-    alpha: float = 2, sparsity: float = 0.7, pruning_type: str = "unstructured"
+    alpha: float = 1.0, sparsity: float = 0.0, pruning_type: str = "unstructured"
 ) -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
-
+    # untrained_net.load_state_dict(
+    #     generate_random_state_dict(untrained_net, seed=42, sparsity=0.9)
+    # )
     # print(f"[get_network_generator_resnet_swat] alpha:{alpha}, sparsity:{sparsity}")
 
     replace_layer_with_swat(
@@ -252,3 +249,127 @@ def get_network_generator_resnet_swat(
         return deepcopy(untrained_net)
 
     return generated_net
+
+
+def test_out() -> None:
+    """Test the output of the SWAT ResNet model."""
+    # Create a random input tensor, with seed=42
+    torch.manual_seed(42)
+    input_tensor = torch.randn(1, 3, 32, 32)
+    fake_config = dict([[], []])
+
+    # Create the original ResNet model
+    original_model = NetCifarResnet18(num_classes=10)
+    original_model.load_state_dict(
+        generate_random_state_dict(original_model, seed=42, sparsity=0)
+    )
+
+    # Create the SWAT ResNet model
+    swat_model = get_network_generator_resnet_swat()(fake_config)
+    swat_model.load_state_dict(
+        generate_random_state_dict(swat_model, seed=42, sparsity=0)
+    )
+
+    # Pass the input tensor through both models
+    original_output = original_model(input_tensor)
+    swat_output = swat_model(input_tensor)
+
+    # print("[test_out] ", original_output)
+    # print("[test_out] ", swat_output)
+
+    # check if all the value of the output are the same
+    assert torch.allclose(
+        original_output, swat_output, atol=1e-7
+    ), "The output of the two models are different"
+
+    # print("[test_out] passed successfully!")
+
+
+def test_gradient() -> None:
+    """Test the gradient of the SWAT ResNet model."""
+    # Create a random input tensor
+    input_tensor = torch.randn(1, 3, 32, 32)
+    fake_config = dict([[], []])
+
+    # Create the SWAT ResNet model
+    swat_model = get_network_generator_resnet_swat()(fake_config)
+
+    # Pass the input tensor through the model
+    output = swat_model(input_tensor)
+
+    # Create a random target tensor
+    target = torch.randint(0, 10, (1,))
+
+    # Calculate the loss
+    loss = F.cross_entropy(output, target)
+
+    # Zero the gradients
+    swat_model.zero_grad()
+
+    # Backward pass
+    loss.backward()
+
+    # print("[test_gradient] passed successfully!")
+
+
+# check if the gradient are the same in the two networks
+def compare_gradients() -> None:
+    """Test if the gradient.
+
+    Check if the SWAT ResNet model is the same as the original ResNet.
+    """
+    # Create a random input tensor
+    input_tensor = torch.randn(1, 3, 32, 32)
+
+    fake_config = dict([[], []])
+    # Create the original ResNet model
+    # print("[compare_gradients] Creating the original ResNet model")
+    original_model = get_resnet18()(fake_config)
+    # original_model.load_state_dict(generate_random_state_dict(original_model,
+    # seed=42, sparsity=0))
+
+    # Create the SWAT ResNet model
+    # print("[compare_gradients] Creating the SWAT ResNet model")
+    swat_model = get_network_generator_resnet_swat()(fake_config)
+    # swat_model.load_state_dict(generate_random_state_dict(
+    # swat_model, seed=42, sparsity=0))
+
+    # Pass the input tensor through the models
+    original_output = original_model(input_tensor)
+    swat_output = swat_model(input_tensor)
+
+    # Create a random target tensor
+    target = torch.randint(0, 10, (1,))
+
+    # Calculate the loss
+    original_loss = F.cross_entropy(original_output, target)
+    swat_loss = F.cross_entropy(swat_output, target)
+
+    # Zero the gradients
+    original_model.zero_grad()
+    swat_model.zero_grad()
+
+    # Backward pass
+    original_loss.backward()
+    swat_loss.backward()
+
+    # check if all the gradient are the same
+    for original_param, swat_param in zip(
+        original_model.parameters(), swat_model.parameters(), strict=True
+    ):
+        assert torch.allclose(
+            original_param.grad, swat_param.grad, atol=1e-7
+        ), "The gradient of the two models are different"
+
+    # print("[compare_gradients] passed successfully!")
+
+
+def test_main() -> None:
+    """Test the SWAT ResNet model."""
+    # test_out()
+    # test_gradient()
+    # compare_gradients()
+
+
+if __name__ == "__main__":
+    test_main()

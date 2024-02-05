@@ -344,8 +344,8 @@ def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> float:
     net1.to(device)
     net2.to(device)
 
-    state_dict1 = net1.state_dict()
-    state_dict2 = net2.state_dict()
+    state_dict1 = [1 if param != 0 else 0 for param in net1.state_dict()]
+    state_dict2 = [1 if param != 0 else 0 for param in net2.state_dict()]
 
     # for k in state_dict1.keys():
     for k in state_dict1:

@@ -88,6 +88,7 @@ def init_weights(module: nn.Module) -> None:
         module,
         nn.Linear | nn.Conv2d,
     ):
+        # print(f"init_weights: {type(module)}")
         # Your code here
         fan_in = calculate_fan_in(module.weight.data)
 
@@ -102,6 +103,21 @@ def init_weights(module: nn.Module) -> None:
         module.weight.data = u
         if module.bias is not None:
             module.bias.data.zero_()
+
+
+def new_init_weights(module: nn.Module) -> None:
+    """Initialize weights for linear and convolutional layers."""
+    if isinstance(module, nn.Linear | nn.Conv2d):
+        fan_in = module.weight.data.size(1)
+        fan_out = module.weight.data.size(0)
+        if isinstance(module, nn.Conv2d):
+            receptive_field_size = np.prod(module.kernel_size) * module.in_channels
+            fan_out *= receptive_field_size
+
+        std = np.sqrt(2.0 / (fan_in + fan_out))  # Xavier initialization
+        nn.init.normal_(module.weight.data, 0, std)
+        if module.bias is not None:
+            nn.init.constant_(module.bias.data, 0)
 
 
 def calculate_fan_in(tensor: torch.Tensor) -> float:
@@ -129,6 +145,9 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
 def get_resnet18() -> Callable[[dict], NetCifarResnet18]:
     """Cifar Resnet18 network generatror."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+    # untrained_net.load_state_dict(
+    #     generate_random_state_dict(untrained_net, seed=42, sparsity=0.9)
+    # )
 
     def generated_net(_config: dict) -> NetCifarResnet18:
         return deepcopy(untrained_net)

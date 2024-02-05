@@ -7,6 +7,11 @@ from typing import cast
 import logging
 from logging import ERROR
 from flwr.common import log
+from project.fed.utils.utils import (
+    generic_get_parameters,
+    generic_set_parameters,
+    print_nonzeros,
+)
 from project.task.cifar_powerprop.models import (
     get_parameters_to_prune,
 )
@@ -140,14 +145,6 @@ def get_train_and_prune(
 
         # parameters_to_prune = get_parameters_to_prune(net)
 
-        metrics = train(
-            net=net,
-            trainloader=trainloader,
-            _config=_config,
-            _working_dir=_working_dir,
-        )
-
-        # get the amount of parameters to prune from the first module that has sparsity
         def get_amount(net: nn.Module) -> float:
             for module in net.modules():
                 if hasattr(module, "sparsity"):
@@ -156,8 +153,21 @@ def get_train_and_prune(
 
         amount = get_amount(net)
         # print(f"[train_and_prune] amount: {amount}")
+        # You must fix that ???
         no_pruning = 0.0
         if amount != no_pruning:
+            print_nonzeros(net, "[train_and_prune] Before pruning:")
+            parameters = generic_get_parameters(net)
+
+            # train the network, with the current parameter
+            metrics = train(
+                net=net,
+                trainloader=trainloader,
+                _config=_config,
+                _working_dir=_working_dir,
+            )
+
+            # prune the network
             parameters_to_prune = get_parameters_to_prune(net)
             prune.global_unstructured(
                 parameters=[
@@ -169,6 +179,27 @@ def get_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
+
+            # create a binary mask of the pruned parameters
+            trained_parameters = generic_get_parameters(net)
+            mask = [param != 0 for param in trained_parameters]
+            # apply the mask to the original parameter
+            parameters = [param * m for param, m in zip(parameters, mask, strict=True)]
+            # set the pruned parameters to the network
+            generic_set_parameters(net, parameters)
+
+        # print the amount of non zero parameter of net
+        print_nonzeros(net, "[train_and_prune] After pruning:")
+        # regular training
+        metrics = train(
+            net=net,
+            trainloader=trainloader,
+            _config=_config,
+            _working_dir=_working_dir,
+        )
+        print_nonzeros(net, "[train_and_prune] After training:")
+
+        # get the amount of parameters to prune from the first module that has sparsity
 
         return metrics
 

@@ -196,6 +196,9 @@ class SWATLinear(nn.Module):
     def forward(self, input):
         if self.sparsity != 0.0:
             self.weight.data = matrix_drop(self.weight, 1 - self.sparsity)
+            print(
+                f"[forward.linear] self.weight: {print_nonzeros_tensor(self.weight)} "
+            )
 
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha == 1.0:

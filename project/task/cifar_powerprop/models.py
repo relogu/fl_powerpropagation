@@ -205,7 +205,7 @@ def get_network_generator_resnet_powerprop(
 
 def get_parameters_to_prune(
     net: nn.Module,
-    first_layer: bool = False,
+    _first_layer: bool = False,
 ) -> Iterable[tuple[nn.Module, str, str]]:
     """Pruning.
 
@@ -213,27 +213,25 @@ def get_parameters_to_prune(
     model.
     """
     parameters_to_prune = []
+    first_layer = _first_layer
 
     def add_immediate_child(
         module: nn.Module,
         name: str,
-        first_layer: bool = True,
     ) -> None:
+        nonlocal first_layer
         if (
             type(module) == PowerPropConv2D
             or type(module) == PowerPropLinear
             or type(module) == nn.Conv2d
             or type(module) == nn.Linear
-        ):
-            if first_layer:
-                first_layer = False
-            # elif module.sparsity != 0.0:
-            else:
-                parameters_to_prune.append((module, "weight", name))
+        ) and not first_layer:
+            first_layer = False
+            parameters_to_prune.append((module, "weight", name))
 
         for _name, immediate_child_module in module.named_children():
-            add_immediate_child(immediate_child_module, _name, first_layer)
+            add_immediate_child(immediate_child_module, _name)
 
-    add_immediate_child(net, "Net", first_layer=first_layer)
+    add_immediate_child(net, "Net")
 
     return parameters_to_prune
