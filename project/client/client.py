@@ -128,19 +128,10 @@ class Client(fl.client.NumPyClient):
 
         # Check, from the config, if the mask has to be used
         if config.extra["mask"]:
-            # mask_path = self.working_dir / f"mask_{self.cid}.npy"
             mask_path = self.working_dir / f"mask_{self.cid}.pickle"
             if mask_path.exists():
-                # mask = np.load(mask_path)
                 with open(mask_path, "rb") as f:
                     mask = pickle.load(f)
-                # print(f"[clien_{self.cid}] Used Mask, saved in: ", mask_path)
-                # print the number of non zero elements in the mask
-                # print(f"[clien_{self.cid}] Number of non zero elements in the mask: ",
-                #    np.count_nonzero(mask))
-                # Create noise, random sampling (1 - mask), for each layer's parameters
-                # np.random.normal(0, 1, param.shape) * (1 - m)
-                # np.random.rand(*param.shape) < 0.5 * (1 - m)
                 noise = [
                     np.random.rand(*param.shape) < config.extra["noise"] * (1 - m)
                     for param, m in zip(parameters, mask, strict=True)
@@ -148,13 +139,8 @@ class Client(fl.client.NumPyClient):
                 # Apply the mask and the noise to the parameters
                 parameters = [
                     param * (m + n)
-                    # (param * m) + n
                     for param, m, n in zip(parameters, mask, noise, strict=True)
                 ]
-                # parameters = [
-                #     param * m
-                #     for param, m in zip(parameters, mask, strict=True)
-                # ]
 
         """
         # Alternative way to create the mask
@@ -217,6 +203,7 @@ class Client(fl.client.NumPyClient):
             config.dataloader_config,
         )
 
+        # FROM ZERO.FL
         # def update_learing_rate(
         #         learning_rate: float,
         #         final_learning_rate: float,
@@ -231,7 +218,7 @@ class Client(fl.client.NumPyClient):
         #     return eta_t
 
         # def interpolate_learning_rate(t, T, lr, LR):
-        tot_rounds = 100
+        tot_rounds = 200
 
         def _interpolate_initial_final_value(
             inittial_value: float,
@@ -307,30 +294,43 @@ class Client(fl.client.NumPyClient):
 
         trained_parameters = generic_get_parameters(self.net)
 
+        def _count_mask_differences(mask1: NDArrays, mask2: NDArrays) -> int:
+            """Count the differences between two masks."""
+            if len(mask1) != len(mask2):
+                raise ValueError("Masks must be the same length")
+
+            count_diff = 0
+            for m1, m2 in zip(mask1, mask2, strict=True):
+                if m1.shape != m2.shape:
+                    raise ValueError("Masks must have the same shape")
+                for i, j in zip(m1, m2, strict=True):
+                    if i != j:
+                        count_diff += 1
+            return count_diff
+
         def _update_rate(parameter: NDArrays, trained_parameters: NDArrays) -> float:
             """Compare the mask difference."""
             update_rate = 0.0
             state_dict1 = [param != 0 for param in parameter]
             state_dict2 = [param != 0 for param in trained_parameters]
-            # compare the mask difference
-            for i in range(len(state_dict1)):
-                for x, y in zip(state_dict1[i], state_dict2[i], strict=True):
-                    if x != y:
-                        update_rate += 1
+
+            update_rate = _count_mask_differences(state_dict1, state_dict2) / len(
+                state_dict1
+            )
             return update_rate
 
+        # print(f"[client_{self.cid}] update_rate: ",
+        # _update_rate(generic_get_parameters(_net), trained_parameters))
         # metrics["update_rate"] = _update_rate(parameters, trained_parameters)
 
         # Check if the mask has been used
         if config.extra["mask"]:
             # Estract the mask from the parameters
-            # mask = trained_parameters != 0
             mask = [param != 0 for param in trained_parameters]
             # Save the mask in the output dir
             mask_path = self.working_dir / f"mask_{self.cid}.pickle"
             with open(mask_path, "wb") as fw:
                 pickle.dump(mask, fw)
-            # print(f"[clien_{self.cid}] Saving mask in: ", mask_path)
 
         return (
             trained_parameters,
