@@ -79,6 +79,7 @@ def replace_layer_with_swat(
                 period=1,
             )
             setattr(module, attr_str, new_conv)
+            # print(f"Replaced {type(target_attr)} with SWATConv2D in {name}")
         if type(target_attr) == nn.Linear:
             new_conv = SWATLinear(
                 alpha=alpha,
@@ -88,6 +89,7 @@ def replace_layer_with_swat(
                 sparsity=sparsity,
             )
             setattr(module, attr_str, new_conv)
+            # print(f"Replaced {type(target_attr)} with SWATLinear in {name}")
 
     for model, immediate_child_module in module.named_children():
         replace_layer_with_swat(immediate_child_module, model, alpha, sparsity)
@@ -175,6 +177,7 @@ def test_out() -> None:
 
     # Create the SWAT ResNet model
     swat_model = get_network_generator_resnet_swat()(fake_config)
+    # swat_model = get_network_generator_resnet_swat()(None)
     swat_model.load_state_dict(
         generate_random_state_dict(swat_model, seed=42, sparsity=0)
     )
@@ -233,12 +236,14 @@ def compare_gradients() -> None:
     # Create the original ResNet model
     # print("[compare_gradients] Creating the original ResNet model")
     original_model = get_resnet18()(fake_config)
+    # original_model = get_resnet18()(None)
     # original_model.load_state_dict(generate_random_state_dict(original_model,
     # seed=42, sparsity=0))
 
     # Create the SWAT ResNet model
     # print("[compare_gradients] Creating the SWAT ResNet model")
     swat_model = get_network_generator_resnet_swat()(fake_config)
+    # swat_model = get_network_generator_resnet_swat()(None)
     # swat_model.load_state_dict(generate_random_state_dict(
     # swat_model, seed=42, sparsity=0))
 

@@ -112,8 +112,9 @@ class swat_linear(Function):
             if bias is not None:
                 output += bias
 
-        if sparsity != 0.0:
-            sparse_input = matrix_drop(input, 1 - sparsity)
+        topk = 1 - sparsity
+        if topk > 0.001:
+            sparse_input = matrix_drop(input, topk)
         else:
             sparse_input = input
 
@@ -193,25 +194,13 @@ class SWATLinear(nn.Module):
 
     def _call_swat_linear(self, input, weight) -> torch.Tensor:
         if self.training:
-            sparsity = self.sparsity
+            sparsity = 1 - print_nonzeros_tensor(weight) / 100
         else:
             # Avoid to sparsify during the evaluation
             sparsity = 0.0
         return swat_linear.apply(input, weight, self.bias, sparsity)
 
     def forward(self, input):
-        if (
-            self.training
-            and (self.weight_sparsity != 0.0 or self.alpha == 1.0)
-            and self.sparsity != 0.0
-        ):
-            log(
-                logging.INFO,
-                f"[swat-linear-fw] PRUNING    alpha:{self.alpha},"
-                f" sparsity:{self.weight_sparsity}",
-            )
-            self.weight.data = matrix_drop(self.weight, 1 - self.weight_sparsity)
-
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha == 1.0:
             powerprop_weight = self.weight
@@ -268,11 +257,10 @@ class swat_conv2d(Function):
         # Just in case you want to copute the threshold every time, add the following line
         # in_threshold = torch.tensor(-1.0) ?
 
-        if sparsity != 0.0:
+        topk = 1 - sparsity
+        if topk > 0.001:  # necassary since too small values create problem to drop
             if in_threshold < 0.0:
-                sparse_input, in_threshold_tensor = drop_nhwc_send_th(
-                    input, 1 - sparsity
-                )
+                sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, topk)
                 in_threshold = in_threshold_tensor.item()
             else:
                 sparse_input = drop_threshold(input, in_threshold)
@@ -365,13 +353,10 @@ class SWATConv2D(nn.Module):
 
     def _call_swat_conv2d(self, input, weight) -> torch.Tensor:
 
-        # To compute the in_threshold evry round just put it to -1.0
-        # if self.epoch >= self.warmup:
-        #     if self.batch_idx % self.period == 0:
-        #         self.in_threshold = torch.tensor(-1.0)
-
         if self.training:
-            sparsity = self.sparsity
+            # for the activation the sparsity used is proportional to the weight sparsity
+            sparsity = 1 - print_nonzeros_tensor(weight) / 100
+            # print(f"[swat_conv2d] weight: {sparsity}")
         else:
             # Avoid to sparsify during the evaluation
             sparsity = 0.0
@@ -396,35 +381,6 @@ class SWATConv2D(nn.Module):
         return output
 
     def forward(self, input):
-        # sparsify the weights
-        if (
-            self.training
-            and (self.weight_sparsity != 0.0 or self.alpha == 1.0)
-            and self.sparsity != 0.0
-        ):
-            log(
-                logging.INFO,
-                f"[swatf-conv-w] PRUNING    alpha:{self.alpha},"
-                f" sparsity:{self.weight_sparsity}",
-            )
-            top_k = 1 - self.weight_sparsity
-            if self.pruning_type == "unstructured":
-                if self.wt_threshold < 0.0:
-                    # Here you have to compute the threshold
-                    self.weight.data, wt_threshold_tensor = drop_nhwc_send_th(
-                        self.weight, top_k
-                    )
-                    self.wt_threshold = wt_threshold_tensor.item()
-                else:
-                    # You already have the threshold
-                    self.weight.data = drop_threshold(self.weight, self.wt_threshold)
-            elif self.pruning_type == "structured_channel":
-                self.weight.data = drop_structured(self.weight, top_k)
-            elif self.pruning_type == "structured_filter":
-                self.weight.data = drop_structured_filter(self.weight, top_k)
-            else:
-                assert 0, "Illegal Pruning Type"
-
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha != 1.0:
             powerprop_weight = torch.sign(self.weight) * torch.pow(

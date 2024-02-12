@@ -7,11 +7,6 @@ from typing import cast
 import logging
 from logging import ERROR
 from flwr.common import log
-from project.fed.utils.utils import (
-    generic_get_parameters,
-    generic_set_parameters,
-    print_nonzeros,
-)
 from project.task.cifar_powerprop.models import (
     get_parameters_to_prune,
 )
@@ -42,6 +37,8 @@ class TrainConfig(BaseModel):
     device: torch.device
     epochs: int
     learning_rate: float
+    final_learning_rate: float  # ? to remove
+    curr_round: int
 
     class Config:
         """Setting to allow any types, including library ones like torch.device."""
@@ -86,10 +83,11 @@ def train(  # pylint: disable=too-many-arguments
     net.train()
 
     criterion = nn.CrossEntropyLoss()
+
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.001,
+        weight_decay=0.003,
     )
 
     final_epoch_per_sample_loss = 0.0
@@ -104,7 +102,7 @@ def train(  # pylint: disable=too-many-arguments
                 ),
                 target.to(config.device),
             )
-            optimizer.zero_grad(set_to_none=True)
+            optimizer.zero_grad()
             output = net(data)
             loss = criterion(output, target)
             final_epoch_per_sample_loss += loss.item()
@@ -121,7 +119,7 @@ def train(  # pylint: disable=too-many-arguments
 
 
 def get_train_and_prune(
-    amount: float = 0.3, pruning_method: str = "base"
+    alpha: float = 1.0, amount: float = 0.0, pruning_method: str = "l1"
 ) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
     """Return the training loop with one step pruning at the end.
 
@@ -143,32 +141,27 @@ def get_train_and_prune(
         """Training and pruning process."""
         log(logging.DEBUG, "Start training")
 
-        # parameters_to_prune = get_parameters_to_prune(net)
+        # train the network, with the current parameter
+        metrics = train(
+            net=net,
+            trainloader=trainloader,
+            _config=_config,
+            _working_dir=_working_dir,
+        )
 
-        def get_amount(net: nn.Module) -> float:
-            for module in net.modules():
-                if hasattr(module, "sparsity"):
-                    return module.sparsity
-            return 0.0
+        base_alpha = 1.0
+        num_pruning_round = 5
 
-        amount = get_amount(net)
-        # print(f"[train_and_prune] amount: {amount}")
-        # You must fix that ???
-        no_pruning = 0.0
-        if amount != no_pruning:
-            print_nonzeros(net, "[train_and_prune] Before pruning:")
-            parameters = generic_get_parameters(net)
-
-            # train the network, with the current parameter
-            metrics = train(
-                net=net,
-                trainloader=trainloader,
-                _config=_config,
-                _working_dir=_working_dir,
-            )
-
-            # prune the network
+        if (
+            _config["curr_round"] < num_pruning_round or alpha == base_alpha
+        ) and amount > 0:
+            """
+            The net must be pruned:
+            - at the first round if we are using powerprop
+            - every round if we are not using powerprop (alpha=1.0)
+            """
             parameters_to_prune = get_parameters_to_prune(net)
+
             prune.global_unstructured(
                 parameters=[
                     (module, tensor_name)
@@ -180,24 +173,8 @@ def get_train_and_prune(
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
 
-            # create a binary mask of the pruned parameters
-            trained_parameters = generic_get_parameters(net)
-            mask = [param != 0 for param in trained_parameters]
-            # apply the mask to the original parameter
-            parameters = [param * m for param, m in zip(parameters, mask, strict=True)]
-            # set the pruned parameters to the network
-            generic_set_parameters(net, parameters)
-
-        # print the amount of non zero parameter of net
-        print_nonzeros(net, "[train_and_prune] After pruning:")
-        # regular training
-        metrics = train(
-            net=net,
-            trainloader=trainloader,
-            _config=_config,
-            _working_dir=_working_dir,
-        )
-        print_nonzeros(net, "[train_and_prune] After training:")
+            del parameters_to_prune
+            torch.cuda.empty_cache()
 
         # get the amount of parameters to prune from the first module that has sparsity
 

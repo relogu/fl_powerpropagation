@@ -1,20 +1,31 @@
-"""CIFAR training and testing functions, local and federated."""
+"""MNIST training and testing functions, local and federated."""
 
 from collections.abc import Sized
 from pathlib import Path
 from typing import cast
+from collections.abc import Callable
+
+import logging
+from logging import ERROR
+from flwr.common import log
+from project.task.cifar_zerofl.models import (
+    get_parameters_to_prune,
+)
 
 import torch
 from pydantic import BaseModel
 from torch import nn
+from torch.nn.utils import prune
 from torch.utils.data import DataLoader
+from project.client.client import ClientConfig
+from project.fed.utils.utils import print_nonzeros
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
 from project.task.default.train_test import (
     get_on_evaluate_config_fn as get_default_on_evaluate_config_fn,
 )
-from project.task.default.train_test import (
-    get_on_fit_config_fn as get_default_on_fit_config_fn,
+from project.types.common import (
+    OnFitConfigFN,
 )
 
 
@@ -162,6 +173,8 @@ def test(
     criterion = nn.CrossEntropyLoss()
     correct, per_sample_loss = 0, 0.0
 
+    # print("Hi Alex, I am in test function")
+
     with torch.no_grad():
         for images, labels in testloader:
             images, labels = (
@@ -187,8 +200,98 @@ def test(
     )
 
 
-# Use defaults as they are completely determined
-# by the other functions defined in mnist_classification
+def get_on_fit_config_fn(fit_config: dict) -> OnFitConfigFN:
+    """Generate on_fit_config_fn based on a dict from the hydra config,.
+
+    Parameters
+    ----------
+    fit_config : Dict
+        The configuration for the fit function.
+        Loaded dynamically from the config file.
+
+    Returns
+    -------
+    Optional[OnFitConfigFN]
+        The on_fit_config_fn for the server if the fit_config is not empty, else None.
+    """
+    # Fail early if the fit_config does not match expectations
+    ClientConfig(**fit_config)
+
+    def fit_config_fn(server_round: int) -> dict:
+        """CIFAR on_fit_config_fn.
+
+        Parameters
+        ----------
+        server_round : int
+            The current server round.
+            Passed to the client
+
+        Returns
+        -------
+        Dict
+            The configuration for the fit function.
+            Loaded dynamically from the config file.
+        """
+        # resolve and convert to python dict
+        fit_config["extra"]["curr_round"] = server_round  # add round info
+        return fit_config
+
+    return fit_config_fn
+
+
+def get_train_and_prune(
+    amount: float = 0.0, pruning_method: str = "base"
+) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
+    """Return the training loop with one step pruning at the end.
+
+    Think about moving 'amount' to the config file
+    """
+    if pruning_method == "base":  # ? not working
+        pruning_method = prune.BasePruningMethod
+    elif pruning_method == "l1":
+        pruning_method = prune.L1Unstructured
+    else:
+        log(ERROR, f"Pruning method {pruning_method} not recognised, using base")
+
+    def train_and_prune(
+        net: nn.Module,
+        trainloader: DataLoader,
+        _config: dict,
+        _working_dir: Path,
+    ) -> tuple[int, dict]:
+        """Training and pruning process."""
+        log(logging.DEBUG, "Start training")
+
+        parameters_to_prune = get_parameters_to_prune(net)
+
+        print_nonzeros(net, "[train_and_prune] Before trainig:")
+
+        metrics = train(
+            net=net,
+            trainloader=trainloader,
+            _config=_config,
+            _working_dir=_working_dir,
+        )
+
+        print_nonzeros(net, "[train_and_prune] After training:")
+        prune.global_unstructured(
+            parameters=[
+                (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+            ],
+            pruning_method=pruning_method,
+            amount=amount,
+        )
+
+        for module, name, _ in parameters_to_prune:
+            prune.remove(module, name)
+
+        print_nonzeros(net, "[train_and_prune] After pruning:")
+
+        return metrics
+
+    return train_and_prune
+
+
 get_fed_eval_fn = get_default_fed_eval_fn
-get_on_fit_config_fn = get_default_on_fit_config_fn
+# get_on_fit_config_fn = get_default_on_fit_config_fn
 get_on_evaluate_config_fn = get_default_on_evaluate_config_fn

@@ -1,32 +1,36 @@
 ---
 project: sweeptry
 program: project.main
-name: sweep_cluster_powerprop
-method: grid
+name: sweep_powerprop_learning_rate
+method: bayes
 
 metric:
   goal: maximize
   name: test_accuracy
 
 parameters:
-  task.alpha:
-    values: [1.0, 1.25, 1.35, 1.5]
-  task.sparsity:
-    values: [0, 0.7, 0.9, 0.95]
-  strategy:
-    values: [fedavgNZ, fedavgNZ_voting, fedavg]
+  # task.alpha:
+  #   values: [1.0, 1.25, 1.35, 1.5]
+  # task.sparsity:
+  #   values: [0, 0.7, 0.9, 0.95]
+  # strategy:
+  #   values: [fedavgNZ, fedavgNZ_voting, fedavg]
   task.fit_config.run_config.learning_rate:
-    values: [0.01, 0.1, 0.2]
-  task.fit_config.extra.mask:
-    values: [true, false]
-  task.fit_config.extra.noise:
-    values: [0.0, 0.1, 0.2]
+    min: 0.01
+    max: 0.5
+  task.fit_config.run_config.final_learning_rate:
+    min: 0.01
+    max: 0.5
+  # task.fit_config.extra.mask:
+  #   values: [true, false]
+  # task.fit_config.extra.noise:
+  #   values: [0.0, 0.1, 0.2]
 
 early_terminate:
   type: hyperband
   s: 2
   eta: 3
-  max_iter: 100
+  max_iter: 200
 
 command:
   - poetry
@@ -35,4 +39,5 @@ command:
   - -m
   - ${program}
   - --config-name=cluster_cifar_powerprop_pruning
+  - fed.num_rounds=200
   - ${args_no_hyphens}

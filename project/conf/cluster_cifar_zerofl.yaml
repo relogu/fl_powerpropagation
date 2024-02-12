@@ -1,10 +1,10 @@
 ---
 defaults:
   - _self_
-  - task: local_cifar_powerprop_pruning
-  - fed: local_cifar
-  - strategy: fedavg
-  - dataset: local_cifar_lda
+  - task: cluster_cifar_zerofl
+  - fed: cluster_cifar
+  - strategy: fedavgNZ
+  - dataset: cluster_cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -19,7 +19,7 @@ working_dir: null
 # at the end of training
 to_save_once: [history, yaml, log]
 
-# List of file patterns to be saved from working_dir repeteadly
+# List of file patterns to be saved repeteadly
 to_save_per_round: [parameters]
 
 # The frequency with which they should be saved
@@ -32,26 +32,27 @@ to_clean_once: [history, parameters, yaml, log]
 # Control wandb logging
 use_wandb: true
 
-# Test without Ray to to enable easy error detection
+# Test without Ray to enable easy error detection
 test_clients:
   all: false
-  one: true
+  one: false
 
 # Wandb configuration
 # add whatever tags you like
 # change the name
 wandb:
   setup:
-    project: local_tests
+    project: powerprop_alpha
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
-      - powerprop
+      - swat
       - alpha_${task.alpha}
+      - sparsity_${task.sparsity}
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
+    name: zerofl-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
 
 # For Ray cluster usage
 # leave null unless you need 

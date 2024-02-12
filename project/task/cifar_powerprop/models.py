@@ -1,88 +1,18 @@
 """CNN model architecture, training, and testing functions for MNIST."""
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 import numpy as np
 
 from copy import deepcopy
 from collections.abc import Callable, Iterable
+from project.task.cifar_resnet18.models import NetCifarResnet18, calculate_fan_in
 
 from project.types.common import NetGen
 from project.utils.utils import lazy_config_wrapper
 
 
 from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
-from torchvision.models import resnet18
-
-
-class Net(nn.Module):
-    """Simple CNN adapted from 'PyTorch: A 60 Minute Blitz."""
-
-    def __init__(self) -> None:
-        """Initialize the network.
-
-        Returns
-        -------
-        None
-        """
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass of the CNN.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input Tensor that will pass through the network
-
-        Returns
-        -------
-        torch.Tensor
-            The resulting Tensor after it has passed through the network
-        """
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = torch.flatten(x, 1)  # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-
-class NetCifarResnet18(nn.Module):
-    """A ResNet18 adapted to CIFAR10."""
-
-    def __init__(
-        self, num_classes: int, device: str = "cuda", groupnorm: bool = False
-    ) -> None:
-        """Initialize network."""
-        super().__init__()
-        self.num_classes = num_classes
-        self.device = device
-        # As the LEAF people do
-        # self.net = resnet18(num_classes=10, norm_layer=lambda x: nn.GroupNorm(2, x))
-        self.net = resnet18(num_classes=self.num_classes)
-        # replace w/ smaller input layer
-        self.net.conv1 = nn.Conv2d(
-            3, 64, kernel_size=3, stride=1, padding=1, bias=False
-        )
-        nn.init.kaiming_normal_(
-            self.net.conv1.weight, mode="fan_out", nonlinearity="relu"
-        )
-        # no need for pooling if training for CIFAR-10
-        self.net.maxpool = nn.Identity()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass."""
-        return self.net(x)
-
 
 get_resnet: NetGen = lazy_config_wrapper(NetCifarResnet18)
 
@@ -103,44 +33,24 @@ def init_weights(module: nn.Module) -> None:
         a, b = -2.0 * std, 2.0 * std
 
         u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
-        if isinstance(
-            module,
-            PowerPropLinear | PowerPropConv2D,
+        if (
+            isinstance(
+                module,
+                PowerPropLinear | PowerPropConv2D,
+            )
+            and module.alpha > 1
         ):
             u = torch.sign(u) * torch.pow(torch.abs(u), 1.0 / module.alpha)
-            # u = torch.sign(u) * torch.pow(torch.abs(u), module.alpha)
 
         module.weight.data = u
         if module.bias is not None:
             module.bias.data.zero_()
 
 
-def calculate_fan_in(tensor: torch.Tensor) -> float:
-    """Calculate fan in.
-
-    Modified from: https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py
-    """
-    min_fan_in = 2
-    dimensions = tensor.dim()
-    if dimensions < min_fan_in:
-        raise ValueError(
-            "Fan in can not be computed for tensor with fewer than 2 dimensions"
-        )
-
-    num_input_fmaps = tensor.size(1)
-    receptive_field_size = 1
-    if dimensions > min_fan_in:
-        for s in tensor.shape[2:]:
-            receptive_field_size *= s
-    fan_in = num_input_fmaps * receptive_field_size
-
-    return float(fan_in)
-
-
 def replace_layer_with_powerprop(
     module: nn.Module,
     name: str = "Model",  # ? Never used. Give some problem
-    alpha: float = 4.0,
+    alpha: float = 1.0,
     sparsity: float = 0.0,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
@@ -173,21 +83,13 @@ def replace_layer_with_powerprop(
         replace_layer_with_powerprop(immediate_child_module, model, alpha, sparsity)
 
 
-def init_model(
-    module: nn.Module,
-) -> None:
-    """Initialize the weights of the layers."""
-    init_weights(module)
-    for _, immediate_child_module in module.named_children():
-        init_model(immediate_child_module)
-
-
 def get_network_generator_resnet_powerprop(
-    alpha: float = 4.0,
+    alpha: float = 1.0,
     sparsity: float = 0.0,
 ) -> Callable[[dict], NetCifarResnet18]:
     """Powerprop Resnet generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+
     replace_layer_with_powerprop(
         module=untrained_net,
         name="NetCifarResnet18",
@@ -195,9 +97,18 @@ def get_network_generator_resnet_powerprop(
         sparsity=sparsity,
     )
 
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        """Initialize the weights of the layers."""
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
     init_model(untrained_net)
 
     def generated_net(_config: dict) -> NetCifarResnet18:
+        """Return a deep copy of the untrained network."""
         return deepcopy(untrained_net)
 
     return generated_net
@@ -225,9 +136,11 @@ def get_parameters_to_prune(
             or type(module) == PowerPropLinear
             or type(module) == nn.Conv2d
             or type(module) == nn.Linear
-        ) and not first_layer:
-            first_layer = False
-            parameters_to_prune.append((module, "weight", name))
+        ):
+            if first_layer:
+                first_layer = False
+            else:
+                parameters_to_prune.append((module, "weight", name))
 
         for _name, immediate_child_module in module.named_children():
             add_immediate_child(immediate_child_module, _name)

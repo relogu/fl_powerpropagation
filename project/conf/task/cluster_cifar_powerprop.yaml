@@ -53,6 +53,7 @@ net_config_initial_parameters: {}
 fit_metrics:
   - train_loss
   - train_accuracy
+  - learning_rate
   # - update_rate
 
 evaluate_metrics:

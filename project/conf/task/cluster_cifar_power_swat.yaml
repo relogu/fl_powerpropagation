@@ -2,14 +2,14 @@
 # These strings are constants used by the dispatcher to select functionality at runtime
 # Please implement all behaviour in the task-level dispatch.py file and then add the dispatch functions to the top-level dispatch.py
 # Choose the model and dataset
-model_and_data: RESNET_POWERPROP
-# model_and_data: CIFAR_SWAT
+model_and_data: POWER_SWAT_RESNET
 # Choose the train, test and server fed_eval functions
-train_structure: CIFAR_POWERPROP_PRUNE
-# train_structure: CIFAR_TRAIN_AND_PRUNE
+train_structure: POWER_SWAT_PRUNE
 
-alpha: 1.25
-sparsity: 0.9
+# Add something like swat_config:
+alpha: 1.0
+sparsity: 0.7
+pruning_type: unstructured
 
 # Client fit config
 fit_config:
@@ -21,7 +21,7 @@ fit_config:
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1
-    learning_rate: 0.3
+    learning_rate: 0.1
     final_learning_rate: 0.01
   # No extra config
   extra: {mask: false, noise: 0.1}
@@ -34,7 +34,7 @@ eval_config:
     batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {mask: false}
+  extra: {mask: true}
 
 # Configuration for the federated testing function
 # Follows the same conventions as the client config
@@ -60,8 +60,8 @@ fit_metrics:
 
 evaluate_metrics:
   - test_accuracy
-  - nomask_test_accuracy
-  - nomask_loss
+  # - nomask_test_accuracy
+  # - nomask_loss
   # - noalpha_loss
   # - noalpha_test_accuracy
   - sparsity

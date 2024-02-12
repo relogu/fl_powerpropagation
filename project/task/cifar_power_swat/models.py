@@ -19,7 +19,7 @@ from project.types.common import NetGen
 from project.utils.utils import lazy_config_wrapper
 
 
-from project.task.utils.swat_modules import SWATConv2D, SWATLinear
+from project.task.utils.power_swat_modules import SWATConv2D, SWATLinear
 
 get_resnet: NetGen = lazy_config_wrapper(NetCifarResnet18)
 
@@ -174,9 +174,10 @@ def test_out() -> None:
     )
 
     # Create the SWAT ResNet model
+    # swat_model = get_network_generator_resnet_swat()(fake_config)
     swat_model = get_network_generator_resnet_swat()(fake_config)
     swat_model.load_state_dict(
-        generate_random_state_dict(swat_model, seed=42, sparsity=0)
+        generate_random_state_dict(swat_model, seed=42, sparsity=0.7)
     )
 
     # Pass the input tensor through both models
@@ -274,7 +275,7 @@ def compare_gradients() -> None:
 
 def test_main() -> None:
     """Test the SWAT ResNet model."""
-    # test_out()
+    test_out()
     # test_gradient()
     # compare_gradients()
 

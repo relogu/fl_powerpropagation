@@ -18,7 +18,7 @@ fit_config:
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1
-    learning_rate: 0.2
+    learning_rate: 0.3
     final_learning_rate: 0.01
   # No extra config
   extra: {mask: false}
@@ -52,6 +52,7 @@ net_config_initial_parameters: {}
 fit_metrics:
   - train_loss
   - train_accuracy
+  - learning_rate
   # - update_rate
 
 evaluate_metrics:

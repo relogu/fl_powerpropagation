@@ -22,16 +22,11 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_powerprop.models import get_network_generator_resnet_powerprop
+from project.task.cifar_zerofl.models import get_network_generator_resnet_swat
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
-from project.task.cifar_powerprop.dataset import (
-    get_dataloader_generators as new_generators,
-)
-from project.task.cifar_powerprop.dataset_old import (
-    get_dataloader_generators as old_generators,
-)
-from project.task.cifar_powerprop.train_test import (
+from project.task.cifar_zerofl.dataset import get_dataloader_generators
+from project.task.cifar_zerofl.train_test import (
     get_fed_eval_fn,
     get_train_and_prune,
     test,
@@ -71,16 +66,17 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "CIFAR_POWERPROP":
+    if train_structure is not None and train_structure.upper() == "CIFAR_ZEROFL":
         return train, test, get_fed_eval_fn
     elif (
-        train_structure is not None
-        and train_structure.upper() == "CIFAR_POWERPROP_PRUNE"
+        train_structure is not None and train_structure.upper() == "CIFAR_ZEROFL_PRUNE"
     ):
         sparsity = cfg.get("task", {}).get("sparsity", 0.0)
-        alpha = cfg.get("task", {}).get("alpha", 1.0)
+        # the sparsity must be modified to include the mask
+        mask = cfg.get("task", {}).get("mask", 0.0)
+        sparsity = sparsity - mask
         return (
-            get_train_and_prune(alpha=alpha, amount=sparsity, pruning_method="l1"),
+            get_train_and_prune(amount=sparsity, pruning_method="l1"),
             test,
             get_fed_eval_fn,
         )
@@ -130,33 +126,25 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
     if client_model_and_data is not None and partition_dir is not None:
         # Obtain the dataloader generators
         # for the provided partition dir
+        (
+            client_dataloader_gen,
+            fed_dataloater_gen,
+        ) = get_dataloader_generators(
+            Path(partition_dir),
+        )
+
+        alpha: float = cfg.get("task", {}).get("alpha", 1)
+        sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
+        # if the train structure is ZERO_FL_PRUNE, than reduce the sparsity
+
+        pruning_type: str = cfg.get("task", {}).get("pruning_type", "unstructured")
 
         # Case insensitive matches
-        if client_model_and_data.upper() == "RESNET_POWERPROP":
-            (
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            ) = new_generators(
-                Path(partition_dir),
-            )
-            alpha = cfg.get("task", {}).get("alpha", 4.0)
-            sparsity = cfg.get("task", {}).get("sparsity", 0.5)
+        if client_model_and_data.upper() == "ZEROFL_RESNET":
             return (
-                get_network_generator_resnet_powerprop(alpha=alpha, sparsity=sparsity),
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            )
-
-        elif client_model_and_data.upper() == "POWERPROP_OLD":
-            (
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            ) = old_generators(
-                Path(partition_dir),
-            )
-            alpha = cfg.get("task", {}).get("alpha", 4.0)
-            return (
-                get_network_generator_resnet_powerprop(alpha=alpha),
+                get_network_generator_resnet_swat(
+                    alpha=alpha, sparsity=sparsity, pruning_type=pruning_type
+                ),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

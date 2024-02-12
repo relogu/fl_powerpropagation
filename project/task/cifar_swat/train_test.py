@@ -39,7 +39,8 @@ class TrainConfig(BaseModel):
     device: torch.device
     epochs: int
     learning_rate: float
-    # final_learning_rate: float # ? to remove
+    final_learning_rate: float  # ? to remove
+    curr_round: int = 0
 
     class Config:
         """Setting to allow any types, including library ones like torch.device."""
@@ -80,16 +81,25 @@ def train(  # pylint: disable=too-many-arguments
     config: TrainConfig = TrainConfig(**_config)
     del _config
 
+    def _enable_weight_sparsity(net: nn.Module) -> None:
+        """Change the sparsity of the SWAT layers."""
+        for module in net.modules():
+            if hasattr(module, "weight_sparsity"):
+                module.weight_sparsity = module.sparsity
+
+    # set the sparcity of the model to 0.0 every round, except the first one
+    if config.curr_round == 1:
+        net.apply(_enable_weight_sparsity)
+
     net.to(config.device)
     net.train()
-
-    # _net = deepcopy(net)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        # weight_decay=0.0005,  # swat:0.0005 previus:0.001 ?
+        # weight_decay=0.001,
+        weight_decay=0.002,
     )
 
     final_epoch_per_sample_loss = 0.0
@@ -111,10 +121,6 @@ def train(  # pylint: disable=too-many-arguments
             num_correct += (output.max(1)[1] == target).clone().detach().sum().item()
             loss.backward()
             optimizer.step()
-            # print_nonzeros(net, "[main] After one round of training:")
-
-    # print_nonzeros(net, "[main] After training:")
-    # net_compare(net, _net, "train")
 
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
