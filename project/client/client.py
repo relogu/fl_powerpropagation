@@ -265,6 +265,10 @@ class Client(fl.client.NumPyClient):
         sparsity = print_nonzeros(
             self.net, f"[client_{self.cid}] before first evaluation:"
         )
+
+        # layer_sparsity = get_layer_sparsity(self.net)
+        # print(f"[client_{self.cid}] layer sparsity: ", layer_sparsity)
+
         testloader = self.dataloader_gen(
             self.cid,
             True,
@@ -294,6 +298,7 @@ class Client(fl.client.NumPyClient):
         )
 
         metrics["sparsity"] = sparsity
+        # metrics["layer_sparsity"] = layer_sparsity
 
         return loss, num_samples, metrics
 

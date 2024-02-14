@@ -87,7 +87,7 @@ def train(  # pylint: disable=too-many-arguments
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        weight_decay=0.003,
+        weight_decay=0.001,
     )
 
     final_epoch_per_sample_loss = 0.0
@@ -150,7 +150,7 @@ def get_train_and_prune(
         )
 
         base_alpha = 1.0
-        num_pruning_round = 5
+        num_pruning_round = 700
 
         if (
             _config["curr_round"] < num_pruning_round or alpha == base_alpha
@@ -174,7 +174,7 @@ def get_train_and_prune(
                 prune.remove(module, name)
 
             del parameters_to_prune
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
         # get the amount of parameters to prune from the first module that has sparsity
 

@@ -65,3 +65,4 @@ evaluate_metrics:
   # - noalpha_loss
   # - noalpha_test_accuracy
   - sparsity
+  - layer_sparsity

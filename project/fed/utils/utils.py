@@ -51,9 +51,6 @@ def generic_set_parameters(
         strict=False,
     )
     state_dict = OrderedDict(
-        # {k: torch.Tensor(v if not to_copy else v.copy()) for k, v in params_dict},
-        # The commented version raise an error: !?
-        # IndexError: index 0 is out of bounds for dimension 0 with size 0 ?
         {k: torch.tensor(v if not to_copy else v.copy()) for k, v in params_dict},
     )
 
@@ -388,6 +385,14 @@ def print_nonzeros_tensor(p: torch.tensor, msg: str = "") -> float:
     return round((nz_count / total_params) * 100, 1)
 
 
+def get_tensor_sparsity(p: torch.tensor) -> float:
+    """Count the rate of non-zero parameter in a tensor."""
+    tensor = p.data.cpu().numpy()
+    nz_count = np.count_nonzero(tensor)
+    total_params = np.prod(tensor.shape)
+    return 1 - (nz_count / total_params)
+
+
 def print_nonzeros(model: nn.Module, msg: str = "") -> float:
     """Print the rate of non-zero parameter in a model."""
     nonzero = total = 0
@@ -403,6 +408,18 @@ def print_nonzeros(model: nn.Module, msg: str = "") -> float:
         f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
     )
     return round(((total - nonzero) / total) * 100, 1)
+
+
+def get_layer_sparsity(model: nn.Module) -> list[float]:
+    """Count the rate of non-zero parameter in a model."""
+    sparsity = []
+    for _, p in model.named_parameters():
+        tensor = p.data.cpu().numpy()
+        nz_count = np.count_nonzero(tensor)
+        total_params = np.prod(tensor.shape)
+        if (nz_count / total_params) != 1 and (nz_count / total_params) != 0:
+            sparsity.append(1 - (nz_count / total_params))
+    return sparsity
 
 
 def print_nonzeros_grad(model: nn.Module, msg: str = "") -> float:

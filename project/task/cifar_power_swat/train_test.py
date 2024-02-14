@@ -154,7 +154,7 @@ def get_train_and_prune(
         num_pruning_round = 5
 
         if (
-            _config["curr_round"] < num_pruning_round or alpha == base_alpha
+            _config["curr_round"] <= num_pruning_round or alpha == base_alpha
         ) and amount > 0:
             """
             The net must be pruned:

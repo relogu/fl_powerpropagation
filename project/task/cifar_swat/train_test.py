@@ -88,7 +88,8 @@ def train(  # pylint: disable=too-many-arguments
                 module.weight_sparsity = module.sparsity
 
     # set the sparcity of the model to 0.0 every round, except the first one
-    if config.curr_round == 1:
+    num_pruning_rounds = 5
+    if config.curr_round < num_pruning_rounds:
         net.apply(_enable_weight_sparsity)
 
     net.to(config.device)
@@ -99,7 +100,7 @@ def train(  # pylint: disable=too-many-arguments
         net.parameters(),
         lr=config.learning_rate,
         # weight_decay=0.001,
-        weight_decay=0.002,
+        weight_decay=0.001,
     )
 
     final_epoch_per_sample_loss = 0.0

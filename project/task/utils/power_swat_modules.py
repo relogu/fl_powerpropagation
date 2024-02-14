@@ -18,7 +18,11 @@ from torch.nn.modules.utils import _pair
 from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 from torch.types import _int, _size
-from project.fed.utils.utils import nonzeros_tensor, print_nonzeros_tensor
+from project.fed.utils.utils import (
+    get_tensor_sparsity,
+    nonzeros_tensor,
+    print_nonzeros_tensor,
+)
 
 from project.task.utils.drop import (
     drop_nhwc_send_th,
@@ -47,11 +51,6 @@ def convolution_backward(
         grad_in_th
     ) = grad_wt_th = stride_grad = padding_grad = dilation_grad = groups_grad = None
 
-    # print(f"[forward.conv] sparse_input: {print_nonzeros_tensor(sparse_input)} ")
-    # print(f"[forward.conv] sparse_weight: {print_nonzeros_tensor(sparse_weight)} ")
-    # the output is not sparsified
-    # print(f"[forward.conv] grad_output: {print_nonzeros_tensor(grad_output)} ")
-
     # Compute gradient w.r.t. input
     if ctx.needs_input_grad[0]:
         input_grad = conv2d_input(
@@ -63,7 +62,6 @@ def convolution_backward(
             conf["dilation"],
             conf["groups"],
         )
-        # print(f"[forward.conv] input_grad: {print_nonzeros_tensor(input_grad)} ")
 
     # Compute gradient w.r.t. weight
     if ctx.needs_input_grad[1]:
@@ -76,15 +74,10 @@ def convolution_backward(
             conf["dilation"],
             conf["groups"],
         )
-        # print(f"[forward.conv] weight_grad: {print_nonzeros_tensor(weight_grad)} ")
 
     # Compute gradient w.r.t. bias (works for every Conv2d shape)
     if bias is not None and ctx.needs_input_grad[2]:
         bias_grad = grad_output.sum(dim=(0, 2, 3))
-        # print(f"[forward.conv] bias_grad: {print_nonzeros_tensor(bias_grad)} ")
-    # print(f"[swat_conv2d_unstructured.backward] grad_output: {nonzeros_rate(grad_output)}")
-    # print(f"[swat_conv2d_unstructured.backward] sparse_input: {nonzeros_rate(sparse_input)} ")#bias: {nonzeros_rate(bias)}")
-    # print(f"[swat_conv2d_unstructured.backward] grad_input: {nonzeros_rate(input_grad)} grad_weight: {nonzeros_rate(weight_grad)}\n")#grad_bias: {nonzeros_rate(bias_grad)}\n")
 
     return (
         input_grad,
@@ -118,10 +111,6 @@ class swat_linear(Function):
         else:
             sparse_input = input
 
-        # print(f"[swat_linear.forward] weight: {nonzeros_rate(weight)} sparse_weight: {nonzeros_rate(sparse_weight)}")
-        # print(f"[swat_linear.forward] input: {nonzeros_rate(input)} sparse_input: {nonzeros_rate(sparse_input)}")
-        # print(f"[swat_linear.forward] output: {nonzeros_rate(output)}\n")
-
         ctx.save_for_backward(sparse_input, weight, bias)
         return output
 
@@ -137,22 +126,6 @@ class swat_linear(Function):
             grad_weight = grad_output.t().mm(sparse_input)
         if bias is not None and ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum(0)
-
-        # print(
-        #     "[backward.swat_linear] sparse_input:"
-        #     f" {print_nonzeros_tensor(sparse_input)} "
-        # )
-        # print(
-        #     "[backward.swat_linear] sparse_weight:"
-        #     f" {print_nonzeros_tensor(sparse_weight)} "
-        # )
-        # print(
-        #     f"[backward.swat_linear] grad_input: {print_nonzeros_tensor(grad_input)} "
-        # )
-        # print(
-        #     f"[backward.swat_linear] grad_weight: {print_nonzeros_tensor(grad_weight)} "
-        # )
-        # print("\n")
 
         return grad_input, grad_weight, grad_bias, None
 
@@ -176,10 +149,6 @@ class SWATLinear(nn.Module):
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.empty(out_features)) if self.b else None
         self.sparsity = sparsity
-        if alpha == 1.0:
-            self.weight_sparsity = sparsity
-        else:
-            self.weight_sparsity = 0.0
 
     def __repr__(self):
         return (
@@ -194,7 +163,7 @@ class SWATLinear(nn.Module):
 
     def _call_swat_linear(self, input, weight) -> torch.Tensor:
         if self.training:
-            sparsity = 1 - print_nonzeros_tensor(weight) / 100
+            sparsity = get_tensor_sparsity(weight)
         else:
             # Avoid to sparsify during the evaluation
             sparsity = 0.0
@@ -231,10 +200,6 @@ class swat_conv2d(Function):
         dilation,
         groups,
     ):
-
-        # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
-        # print(f"[forward.conv] weight: {print_nonzeros_tensor(weight)} ")
-
         output = F.conv2d(
             input=input,
             weight=weight,
@@ -254,20 +219,13 @@ class swat_conv2d(Function):
         # if self.epoch >= self.warmup:
         #     if self.batch_idx % self.period == 0:
 
-        # Just in case you want to copute the threshold every time, add the following line
-        # in_threshold = torch.tensor(-1.0) ?
-
         topk = 1 - sparsity
-        if topk > 0.001:  # necassary since too small values create problem to drop
+        if topk > 0.001:  # necassary since too small values create problem to drop !???
             if in_threshold < 0.0:
                 sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, topk)
                 in_threshold = in_threshold_tensor.item()
             else:
                 sparse_input = drop_threshold(input, in_threshold)
-            # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
-            # print(f"[forward.conv] output: {print_nonzeros_tensor(output)} ")
-            # print(f"[forward.conv] sparse_input: {print_nonzeros_tensor(sparse_input)}")
-
         else:
             sparse_input = input
 
@@ -325,10 +283,6 @@ class SWATConv2D(nn.Module):
         self.dilation = _pair(dilation)
         self.groups = groups
         self.sparsity = sparsity
-        if alpha == 1.0:
-            self.weight_sparsity = sparsity
-        else:
-            self.weight_sparsity = 0.0
         self.pruning_type = pruning_type
         self.warmup = warm_up
         self.period = period
@@ -355,8 +309,7 @@ class SWATConv2D(nn.Module):
 
         if self.training:
             # for the activation the sparsity used is proportional to the weight sparsity
-            sparsity = 1 - print_nonzeros_tensor(weight) / 100
-            # print(f"[swat_conv2d] weight: {sparsity}")
+            sparsity = get_tensor_sparsity(weight)
         else:
             # Avoid to sparsify during the evaluation
             sparsity = 0.0
@@ -386,6 +339,9 @@ class SWATConv2D(nn.Module):
             powerprop_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )
+            # powerprop_weight = self.weight * torch.pow(
+            #     self.weight.abs(), self.alpha - 1
+            # )
         else:
             powerprop_weight = self.weight
 
