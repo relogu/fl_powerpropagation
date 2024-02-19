@@ -37,8 +37,9 @@ class TrainConfig(BaseModel):
     device: torch.device
     epochs: int
     learning_rate: float
-    final_learning_rate: float  # ? to remove
+    # final_learning_rate: float  # ? to remove
     curr_round: int
+    cid: int
 
     class Config:
         """Setting to allow any types, including library ones like torch.device."""
@@ -151,6 +152,11 @@ def get_train_and_prune(
 
         base_alpha = 1.0
         num_pruning_round = 700
+        num_scales = 5
+        sparsity_range = 1 - amount
+        sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
+
+        # print(f"[client_{_config['cid']}]sparsity_inc: {sparsity_inc}")
 
         if (
             _config["curr_round"] < num_pruning_round or alpha == base_alpha
@@ -168,7 +174,7 @@ def get_train_and_prune(
                     for module, tensor_name, _ in parameters_to_prune
                 ],
                 pruning_method=pruning_method,
-                amount=amount,
+                amount=amount + sparsity_inc,
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)

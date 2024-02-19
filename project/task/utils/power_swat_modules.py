@@ -106,10 +106,10 @@ class swat_linear(Function):
                 output += bias
 
         topk = 1 - sparsity
-        if topk > 0.001:
-            sparse_input = matrix_drop(input, topk)
-        else:
-            sparse_input = input
+        if topk < 0.01:
+            topk = 0.01
+
+        sparse_input = matrix_drop(input, topk)
 
         ctx.save_for_backward(sparse_input, weight, bias)
         return output
@@ -220,14 +220,16 @@ class swat_conv2d(Function):
         #     if self.batch_idx % self.period == 0:
 
         topk = 1 - sparsity
-        if topk > 0.001:  # necassary since too small values create problem to drop !???
-            if in_threshold < 0.0:
-                sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, topk)
-                in_threshold = in_threshold_tensor.item()
-            else:
-                sparse_input = drop_threshold(input, in_threshold)
+        # necassary since too small values create problem to drop !???
+        if topk < 0.01:
+            topk = 0.01
+
+        sparse_input = matrix_drop(input, topk)
+        if in_threshold < 0.0:
+            sparse_input, in_threshold_tensor = drop_nhwc_send_th(input, topk)
+            in_threshold = in_threshold_tensor.item()
         else:
-            sparse_input = input
+            sparse_input = drop_threshold(input, in_threshold)
 
         ctx.conf = {
             "stride": stride,
