@@ -245,10 +245,12 @@ class swat_conv2d(Function):
 
         # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
         # print(f"[forward.conv] weight: {print_nonzeros_tensor(weight)} ")
+        sparse_weight, wt_threshold = drop_nhwc_send_th(weight, 1 - sparsity)
 
         output = F.conv2d(
             input=input,
-            weight=weight,
+            weight=sparse_weight,
+            # weight=weight,
             bias=bias,
             stride=stride,
             padding=padding,
@@ -290,7 +292,7 @@ class swat_conv2d(Function):
             "groups": groups,
         }
 
-        ctx.save_for_backward(sparse_input, weight, bias)
+        ctx.save_for_backward(sparse_input, sparse_weight, bias)
 
         return output, in_threshold
 
@@ -401,7 +403,7 @@ class SWATConv2D(nn.Module):
             self.training
             and (self.weight_sparsity != 0.0 or self.alpha == 1.0)
             and self.sparsity != 0.0
-        ):
+        ) or True:
             log(
                 logging.INFO,
                 f"[swatf-conv-w] PRUNING    alpha:{self.alpha},"
@@ -411,17 +413,17 @@ class SWATConv2D(nn.Module):
             if self.pruning_type == "unstructured":
                 if self.wt_threshold < 0.0:
                     # Here you have to compute the threshold
-                    self.weight.data, wt_threshold_tensor = drop_nhwc_send_th(
+                    self.weight, wt_threshold_tensor = drop_nhwc_send_th(
                         self.weight, top_k
                     )
                     self.wt_threshold = wt_threshold_tensor.item()
                 else:
                     # You already have the threshold
-                    self.weight.data = drop_threshold(self.weight, self.wt_threshold)
+                    self.weight = drop_threshold(self.weight, self.wt_threshold)
             elif self.pruning_type == "structured_channel":
-                self.weight.data = drop_structured(self.weight, top_k)
+                self.weight = drop_structured(self.weight, top_k)
             elif self.pruning_type == "structured_filter":
-                self.weight.data = drop_structured_filter(self.weight, top_k)
+                self.weight = drop_structured_filter(self.weight, top_k)
             else:
                 assert 0, "Illegal Pruning Type"
 

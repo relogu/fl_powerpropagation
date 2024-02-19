@@ -182,6 +182,8 @@ class Client(fl.client.NumPyClient):
             # total_rounds=config.extra["total_rounds"]
         )
 
+        config.run_config["cid"] = self.cid
+
         log(
             logging.INFO,
             f"[client_{self.cid}] lr: {config.run_config['learning_rate']}",
