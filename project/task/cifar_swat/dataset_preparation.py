@@ -208,9 +208,6 @@ def download_and_preprocess(cfg: DictConfig) -> None:
         testset,
         cfg.dataset.num_clients,
         cfg.dataset.seed,
-        cfg.dataset.iid,
-        cfg.dataset.power_law,
-        cfg.dataset.lda,
         cfg.dataset.lda_alpha,
         cfg.dataset.balance,
     )
