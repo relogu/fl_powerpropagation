@@ -57,8 +57,8 @@ def _partition_data(
     testset: CIFAR10,
     num_clients: int,
     seed: int,
-    lda_alpha: float,
     balance: bool,
+    lda_alpha: float = 1,
 ) -> tuple[list[Subset] | list[ConcatDataset] | tuple[XYList, np.ndarray], CIFAR10]:
     """Split training set into iid or non iid partitions to simulate the federated.
 
@@ -68,14 +68,9 @@ def _partition_data(
     ----------
     num_clients : int
         The number of clients that hold a part of the data
-    iid : bool
-        Whether the data should be independent and identically distributed between
-        the clients or if the data should first be sorted by labels and distributed
-        by chunks to each client (used to test the convergence in a worst case scenario)
-        , by default False
-    power_law: bool
-        Whether to follow a power-law distribution when assigning number of samples
-        for each client, defaults to True
+    lda_alpha : float
+        The concentration parameter for the dirichlet distribution, by default 0.5
+
     balance : bool
         Whether the dataset should contain an equal number of samples in each class,
         by default False
