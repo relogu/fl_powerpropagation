@@ -196,7 +196,6 @@ exclude = [
     "proto",
     "project/task/utils",
     "project/fed/server/strategy",
-    "project/task/cifar_resnet18/common.py"
 ]
 
 [tool.ruff.format]

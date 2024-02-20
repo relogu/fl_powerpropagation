@@ -155,6 +155,7 @@ def get_train_and_prune(
         num_scales = 5
         sparsity_range = 1 - amount
         sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
+        sparsity_inc = 0
 
         # print(f"[client_{_config['cid']}]sparsity_inc: {sparsity_inc}")
 
