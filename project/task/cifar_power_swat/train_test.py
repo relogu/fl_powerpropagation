@@ -1,6 +1,7 @@
 """MNIST training and testing functions, local and federated."""
 
 from collections.abc import Sized
+from copy import deepcopy
 from pathlib import Path
 from typing import cast
 from collections.abc import Callable
@@ -8,6 +9,12 @@ from collections.abc import Callable
 import logging
 from logging import ERROR
 from flwr.common import log
+from project.fed.utils.utils import (
+    generic_get_parameters,
+    generic_set_parameters,
+    net_compare,
+    print_nonzeros,
+)
 from project.task.cifar_power_swat.models import (
     get_parameters_to_prune,
 )
@@ -142,6 +149,8 @@ def get_train_and_prune(
         """Training and pruning process."""
         log(logging.DEBUG, "Start training")
 
+        print_nonzeros(net, "[train] Before training:")
+        before_train_net = deepcopy(net)
         # train the network, with the current parameter
         metrics = train(
             net=net,
@@ -149,10 +158,13 @@ def get_train_and_prune(
             _config=_config,
             _working_dir=_working_dir,
         )
+        after_train_net = deepcopy(net)
+        after_training_sparsity = print_nonzeros(net, "[train] After training:")
+        after_training_metrics = net_compare(before_train_net, after_train_net)
+        # print("!!![NET_COMPARE] After training", after_training_metrics)
 
         base_alpha = 1.0
-        num_pruning_round = 5
-
+        num_pruning_round = 1000
         if (
             _config["curr_round"] <= num_pruning_round or alpha == base_alpha
         ) and amount > 0:
@@ -161,6 +173,7 @@ def get_train_and_prune(
             - at the first round if we are using powerprop
             - every round if we are not using powerprop (alpha=1.0)
             """
+
             parameters_to_prune = get_parameters_to_prune(net)
 
             prune.global_unstructured(
@@ -175,9 +188,28 @@ def get_train_and_prune(
                 prune.remove(module, name)
 
             del parameters_to_prune
-            torch.cuda.empty_cache()
-
+            # torch.cuda.empty_cache()
+        after_pruning_sparsity = print_nonzeros(net, "[train] After pruning:")
+        after_prune_net = deepcopy(before_train_net)
+        generic_set_parameters(after_prune_net, generic_get_parameters(net))
+        after_pruning_metrics = net_compare(before_train_net, after_prune_net)
+        # print("!!![NET_COMPARE] After pruning:", after_pruning_metrics)
         # get the amount of parameters to prune from the first module that has sparsity
+
+        if _config["curr_round"] > 1:
+            metrics[1]["after_training_activation"] = after_training_metrics[
+                "activated"
+            ]
+            metrics[1]["after_training_deactivation"] = after_training_metrics[
+                "deactivated"
+            ]
+            metrics[1]["after_training_sparsity"] = after_training_sparsity
+            metrics[1]["after_pruning_activation"] = after_pruning_metrics["activated"]
+            metrics[1]["after_pruning_deactivation"] = after_pruning_metrics[
+                "deactivated"
+            ]
+            metrics[1]["after_pruning_sparsity"] = after_pruning_sparsity
+        # print(f"The metrics are {metrics[1]}")
 
         return metrics
 

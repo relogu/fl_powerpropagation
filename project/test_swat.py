@@ -24,7 +24,6 @@ from omegaconf import DictConfig
 # Never do a relative import nor one that assumes a given folder structure
 from project.fed.utils.utils import (
     generate_random_state_dict,
-    net_compare,
     print_nonzeros,
 )
 from project.types.common import NetGen
@@ -96,7 +95,7 @@ def main(cfg: DictConfig) -> None:
     log(logging.INFO, f"[main] It took {int(time.time() - start_time)}s to run")
 
     # Comparing original network and the trained one
-    net_compare(net, _net, "main")
+    # net_compare(net, _net, "main")
     print_nonzeros(_net, "[main] Starting model:")
     print_nonzeros(net, "[main] Trained model:")
     plot_abs_parameter_distribution(_net, net)

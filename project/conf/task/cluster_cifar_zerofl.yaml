@@ -9,7 +9,7 @@ train_structure: CIFAR_ZEROFL_PRUNE
 # Add something like swat_config:
 alpha: 1.0
 sparsity: 0.9
-mask: 0.2
+mask: 0.0
 pruning_type: unstructured
 
 # Client fit config

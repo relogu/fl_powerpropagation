@@ -26,7 +26,6 @@ from omegaconf import DictConfig
 # Never do a relative import nor one that assumes a given folder structure
 from project.fed.utils.utils import (
     generate_random_state_dict,
-    net_compare,
 )
 from project.types.common import NetGen
 from project.utils.utils import (
@@ -87,7 +86,7 @@ def main(cfg: DictConfig) -> None:
     log(logging.INFO, f"[main] It took {int(time.time() - start_time)}s to run")
 
     # Comparing original network and the trained one
-    net_compare(_net, net, "main")
+    # net_compare(_net, net, "main")
 
     plot_abs_parameter_distribution(_net, net)
     log(logging.INFO, f"[main] It took {int(time.time() - start_time)}s to run")

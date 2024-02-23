@@ -16,6 +16,10 @@ gpus_per_client: 0.2  # 0.14 - 7 actors per GPU
 # Seed for client selection
 seed: 1337
 
+# 5378
+# 9421
+# 2035
+
 # Settings for loading the initial parameters 
 # used by the server
 

@@ -226,6 +226,8 @@ class Client(fl.client.NumPyClient):
 
         metrics["learning_rate"] = config.run_config["learning_rate"]
 
+        # print(f"[CLIENT!!!] the metrics are: {metrics}")
+
         return (
             trained_parameters,
             num_samples,

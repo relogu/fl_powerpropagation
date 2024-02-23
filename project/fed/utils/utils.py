@@ -332,8 +332,61 @@ def test_client(
                 )
 
 
-def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> float:
+def set_non_value_to(model: nn.Module, value: float) -> None:
+    """Set non-value parameters in the model to the specified value."""
+    for param in model.parameters():
+        param.data[param.data != 0] = value
+
+
+def sum_recursive(net1: nn.Module, net2: nn.Module) -> nn.Module:
+    """Recursively sum all parameters in the model."""
+    for p1, p2 in zip(net1.parameters(), net2.parameters(), strict=True):
+        p1 = p1.cpu() + p2.cpu()
+    return net1
+
+
+def count_values(model: nn.Module, value: float = 0) -> int:
+    """Count the number of parameters in the model with the specified value."""
+    count = 0
+    for param in model.parameters():
+        count += torch.sum(param.data == value).item()
+    return count
+
+
+def net_compare(
+    net1: nn.Module, net2: nn.Module, value1: float = 2.0, value2: float = 1.0
+) -> dict[str, float]:
     """Count the rate of different parameter between two network."""
+    device = torch.device(
+        "cuda:0" if torch.cuda.is_available() else "cpu",
+    )
+    net1.to(device)
+    net2.to(device)
+
+    set_non_value_to(net1, value1)
+    set_non_value_to(net2, value2)
+
+    for p1, p2 in zip(net1.parameters(), net2.parameters(), strict=True):
+        p1.cpu()
+        p2.cpu()
+        p1.data = p1.data + p2.data
+
+    # summed = sum_recursive(net1, net2)
+
+    return {
+        "activated": count_values(net1, value2),
+        "deactivated": count_values(net1, value1),
+    }
+    # return {
+    #     '0': count_values(net1, 0),
+    #     '1': count_values(net1, value2),
+    #     '2': count_values(net1, value1),
+    #     '3': count_values(net1, value1+value2)
+    # }
+
+
+"""def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> dict[str, float]:
+
     device = torch.device(
         "cuda:0" if torch.cuda.is_available() else "cpu",
     )
@@ -341,28 +394,43 @@ def net_compare(net1: nn.Module, net2: nn.Module, msg: str = "") -> float:
     net1.to(device)
     net2.to(device)
 
-    state_dict1 = [1 if param != 0 else 0 for param in net1.state_dict()]
-    state_dict2 = [1 if param != 0 else 0 for param in net2.state_dict()]
+    # Convert the networks to evaluation mode
+    net1.eval()
+    net2.eval()
 
-    # for k in state_dict1.keys():
-    for k in state_dict1:
-        state_dict1[k] = torch.sub(state_dict1[k], state_dict2[k], alpha=1)
+    # Initialize counters
+    count_0 = 0  # Weight was 0 in both
+    count_1 = 0  # Weight non-zero in the second
+    count_2 = 0  # Weight non-zero in the first
+    count_3 = 0  # Weight non-zero in both
 
-    nz_count = 0
-    total_params = 0
-    # for k in state_dict1.keys():
-    for k in state_dict1:
-        nz, param = nonzeros_tensor(state_dict1[k])
-        nz_count += nz
-        total_params += param
+    # Iterate through the parameters of both networks
+    for param1, param2 in zip(net1.parameters(), net2.parameters()):
+        # Convert parameters to numpy arrays
+        param1_np = param1.cpu().detach().numpy()
+        param2_np = param2.cpu().detach().numpy()
 
-    log(
-        logging.INFO,
-        f"[{msg}] Modified: {nz_count:7}, Equal: {total_params - nz_count:7}, total:"
-        f" {total_params:7},"
-        f" ({(nz_count / total_params) * 100:6.2f}% Modified)",
-    )
-    return round((nz_count / total_params) * 100, 1)
+        # Compare individual parameters
+        for p1, p2 in zip(param1_np.flatten(), param2_np.flatten()):
+            if p1 == 0 and p2 == 0:
+                count_0 += 1
+            elif p1 == 0:
+                count_1 += 1
+            elif p2 == 0:
+                count_2 += 1
+            else:
+                count_3 += 1
+
+    # Calculate the total count
+    total_count = count_0 + count_1 + count_2 + count_3
+
+    # Return the counts as a dictionary
+    return {
+        # '0': count_0 / total_count,
+        'activate': count_1,
+        'deactivate': count_2,
+        # '3': count_3 / total_count
+    }"""
 
 
 def nonzeros_tensor(p: torch.tensor) -> tuple[int, int]:

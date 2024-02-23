@@ -99,7 +99,6 @@ def train(  # pylint: disable=too-many-arguments
     optimizer = torch.optim.SGD(
         net.parameters(),
         lr=config.learning_rate,
-        # weight_decay=0.001,
         weight_decay=0.001,
     )
 
@@ -296,6 +295,9 @@ def get_train_and_prune(
         for module, name, _ in parameters_to_prune:
             prune.remove(module, name)
         print_nonzeros(net, "[train_and_prune] After pruning:")
+
+        del parameters_to_prune
+
         return metrics
 
     return train_and_prune

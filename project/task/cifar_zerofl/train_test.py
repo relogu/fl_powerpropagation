@@ -287,6 +287,8 @@ def get_train_and_prune(
 
         print_nonzeros(net, "[train_and_prune] After pruning:")
 
+        del parameters_to_prune
+
         return metrics
 
     return train_and_prune

@@ -149,12 +149,11 @@ def get_train_and_prune(
             _config=_config,
             _working_dir=_working_dir,
         )
-
         base_alpha = 1.0
-        num_pruning_round = 700
-        num_scales = 5
-        sparsity_range = 1 - amount
-        sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
+        num_pruning_round = 1000
+        # num_scales = 5
+        # sparsity_range = 1 - amount
+        # sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
         sparsity_inc = 0
 
         # print(f"[client_{_config['cid']}]sparsity_inc: {sparsity_inc}")
