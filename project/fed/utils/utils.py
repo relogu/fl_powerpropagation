@@ -475,7 +475,7 @@ def print_nonzeros(model: nn.Module, msg: str = "") -> float:
         f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
         f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
     )
-    return round(((total - nonzero) / total) * 100, 1)
+    return round(((total - nonzero) / total) * 100, 3)
 
 
 def get_layer_sparsity(model: nn.Module) -> list[float]:

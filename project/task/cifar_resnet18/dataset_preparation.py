@@ -12,7 +12,7 @@ from flwr.common.logger import log
 from omegaconf import DictConfig, OmegaConf
 from torch.utils.data import ConcatDataset, Subset, random_split, DataLoader
 from torchvision import transforms
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import CIFAR10, CIFAR100
 
 from project.utils.utils import obtain_device
 from project.task.utils.common import XYList, create_lda_partitions
@@ -22,7 +22,8 @@ HYDRA_FULL_ERROR = 1
 
 def _download_data(
     dataset_dir: Path,
-) -> tuple[CIFAR10, CIFAR10]:  # ?
+    num_classes: int = 10,
+) -> tuple[CIFAR10, CIFAR10] | tuple[CIFAR100, CIFAR100]:  # ?
     """Download (if necessary) and returns the CIFAR10 dataset.
 
     Returns
@@ -36,25 +37,39 @@ def _download_data(
 
     dataset_dir.mkdir(parents=True, exist_ok=True)
 
-    trainset = CIFAR10(
-        str(dataset_dir),
-        train=True,
-        download=True,
-        transform=transform,
-    )
-    testset = CIFAR10(
-        str(dataset_dir),
-        train=False,
-        download=True,
-        transform=transform,
-    )
+    if num_classes == 100:  # noqa: PLR2004
+        trainset = CIFAR100(
+            str(dataset_dir),
+            train=True,
+            download=True,
+            transform=transform,
+        )
+        testset = CIFAR100(
+            str(dataset_dir),
+            train=False,
+            download=True,
+            transform=transform,
+        )
+    else:
+        trainset = CIFAR10(
+            str(dataset_dir),
+            train=True,
+            download=True,
+            transform=transform,
+        )
+        testset = CIFAR10(
+            str(dataset_dir),
+            train=False,
+            download=True,
+            transform=transform,
+        )
     return trainset, testset
 
 
 # pylint: disable=too-many-locals
 def _partition_data(
-    trainset: CIFAR10,
-    testset: CIFAR10,
+    trainset: CIFAR10 | CIFAR100,
+    testset: CIFAR10 | CIFAR100,
     num_clients: int,
     seed: int,
     iid: bool,
@@ -62,7 +77,9 @@ def _partition_data(
     lda: bool,
     lda_alpha: float,
     balance: bool,
-) -> tuple[list[Subset] | list[ConcatDataset] | tuple[XYList, np.ndarray], CIFAR10]:
+) -> tuple[
+    list[Subset] | list[ConcatDataset] | tuple[XYList, np.ndarray], CIFAR10 | CIFAR100
+]:
     """Split training set into iid or non iid partitions to simulate the federated.
 
     setting.
@@ -405,6 +422,7 @@ def download_and_preprocess(cfg: DictConfig) -> None:
     # Download the dataset
     trainset, testset = _download_data(
         Path(cfg.dataset.dataset_dir),
+        cfg.dataset.num_classes,
     )
 
     # Partition the dataset

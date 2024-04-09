@@ -121,8 +121,12 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
 
         # Case insensitive matches
         if client_model_and_data.upper() == "CIFAR_RESNET18":
+            num_classes: int = cfg.get("dataset", {}).get(
+                "num_classes",
+                10,
+            )
             return (
-                get_resnet18(),
+                get_resnet18(num_classes=num_classes),
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )

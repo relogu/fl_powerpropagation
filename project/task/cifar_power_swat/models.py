@@ -30,7 +30,6 @@ def init_weights(module: nn.Module) -> None:
         module,
         SWATLinear | SWATConv2D | nn.Linear | nn.Conv2d,
     ):
-        # Your code here
         fan_in = calculate_fan_in(module.weight.data)
 
         # constant from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
@@ -94,10 +93,13 @@ def replace_layer_with_swat(
 
 
 def get_network_generator_resnet_swat(
-    alpha: float = 1.0, sparsity: float = 0.0, pruning_type: str = "unstructured"
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 10,
+    pruning_type: str = "unstructured",
 ) -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
-    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
 
     replace_layer_with_swat(
         module=untrained_net,
@@ -200,9 +202,60 @@ def test_gradient() -> None:
     # Create a random input tensor
     input_tensor = torch.randn(1, 3, 32, 32)
     fake_config = dict([[], []])
+    # fake_config = None
 
     # Create the SWAT ResNet model
     swat_model = get_network_generator_resnet_swat()(fake_config)
+
+    def generic_get_parameters(net: nn.Module) -> list:
+        """Implement generic `get_parameters` for Flower Client.
+
+        Parameters
+        ----------
+        net : nn.Module
+            The network whose parameters should be returned.
+
+        Returns
+        -------
+        list
+            The compressed parameters of the network in CSR format.
+        """
+        # Prune the model (if necessary)
+
+        # Extract the pruned weights
+        state_dict_items = sorted(net.state_dict().items(), key=lambda x: x[0])
+        parameters = [val.cpu().numpy() for _, val in state_dict_items]
+
+        # Compress the weights using CSR format
+        compressed_parameters = []
+        for param in parameters:
+            # Convert the numpy array to a PyTorch tensor
+            param_tensor = torch.tensor(param)
+
+            # Reshape the tensor to ensure it's 2-dimensional
+            param_tensor = param_tensor.view(-1, 1)
+
+            # Create a compressed sparse tensor (CSR format)
+            compressed_tensor = torch.sparse_coo_tensor(
+                param_tensor.nonzero().t(),
+                param_tensor[param_tensor != 0],
+                size=param_tensor.shape,
+            )
+
+            # Append the compressed tensor to the list
+            compressed_parameters.append(compressed_tensor)
+
+        return compressed_parameters
+
+    # compressed_parameters = generic_get_parameters(swat_model)
+
+    # memory_usage_bytes = 0
+    # for i, param in enumerate(compressed_parameters):
+    #     # Total number of non-zero elements + number of zero elements
+    #     total_elements = param._nnz() # + param._values().numel()
+    #     element_size = param.element_size()  # Size of each element in bytes
+    #     memory_usage_bytes += total_elements * element_size  # Memory usage in bytes
+    # print(f"Memory usage of compressed parameter: {memory_usage_bytes} bytes")
 
     # Pass the input tensor through the model
     output = swat_model(input_tensor)
@@ -231,6 +284,7 @@ def compare_gradients() -> None:
     input_tensor = torch.randn(1, 3, 32, 32)
 
     fake_config = dict([[], []])
+    # fake_config = None
     # Create the original ResNet model
     # print("[compare_gradients] Creating the original ResNet model")
     original_model = get_resnet18()(fake_config)
@@ -275,8 +329,8 @@ def compare_gradients() -> None:
 
 def test_main() -> None:
     """Test the SWAT ResNet model."""
-    test_out()
-    # test_gradient()
+    # test_out()
+    test_gradient()
     # compare_gradients()
 
 

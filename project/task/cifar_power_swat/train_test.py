@@ -161,7 +161,6 @@ def get_train_and_prune(
         after_train_net = deepcopy(net)
         after_training_sparsity = print_nonzeros(net, "[train] After training:")
         after_training_metrics = net_compare(before_train_net, after_train_net)
-        # print("!!![NET_COMPARE] After training", after_training_metrics)
 
         base_alpha = 1.0
         num_pruning_round = 1000

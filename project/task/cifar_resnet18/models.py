@@ -142,9 +142,9 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
     return float(fan_in)
 
 
-def get_resnet18() -> Callable[[dict], NetCifarResnet18]:
+def get_resnet18(num_classes: int = 10) -> Callable[[dict], NetCifarResnet18]:
     """Cifar Resnet18 network generatror."""
-    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
     # untrained_net.load_state_dict(
     #     generate_random_state_dict(untrained_net, seed=42, sparsity=0.9)
     # )

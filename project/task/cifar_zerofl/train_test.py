@@ -1,6 +1,7 @@
 """MNIST training and testing functions, local and federated."""
 
 from collections.abc import Sized
+from copy import deepcopy
 from pathlib import Path
 from typing import cast
 from collections.abc import Callable
@@ -18,7 +19,12 @@ from torch import nn
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
 from project.client.client import ClientConfig
-from project.fed.utils.utils import print_nonzeros
+from project.fed.utils.utils import (
+    generic_get_parameters,
+    generic_set_parameters,
+    net_compare,
+    print_nonzeros,
+)
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
 from project.task.default.train_test import (
@@ -265,6 +271,7 @@ def get_train_and_prune(
         parameters_to_prune = get_parameters_to_prune(net)
 
         print_nonzeros(net, "[train_and_prune] Before trainig:")
+        before_train_net = deepcopy(net)
 
         metrics = train(
             net=net,
@@ -272,6 +279,9 @@ def get_train_and_prune(
             _config=_config,
             _working_dir=_working_dir,
         )
+        after_train_net = deepcopy(net)
+        after_training_sparsity = print_nonzeros(net, "[train] After training:")
+        after_training_metrics = net_compare(before_train_net, after_train_net)
 
         print_nonzeros(net, "[train_and_prune] After training:")
         prune.global_unstructured(
@@ -285,9 +295,26 @@ def get_train_and_prune(
         for module, name, _ in parameters_to_prune:
             prune.remove(module, name)
 
-        print_nonzeros(net, "[train_and_prune] After pruning:")
-
         del parameters_to_prune
+
+        after_pruning_sparsity = print_nonzeros(net, "[train] After pruning:")
+        after_prune_net = deepcopy(before_train_net)
+        generic_set_parameters(after_prune_net, generic_get_parameters(net))
+        after_pruning_metrics = net_compare(before_train_net, after_prune_net)
+
+        if _config["curr_round"] > 1:
+            metrics[1]["after_training_activation"] = after_training_metrics[
+                "activated"
+            ]
+            metrics[1]["after_training_deactivation"] = after_training_metrics[
+                "deactivated"
+            ]
+            metrics[1]["after_training_sparsity"] = after_training_sparsity
+            metrics[1]["after_pruning_activation"] = after_pruning_metrics["activated"]
+            metrics[1]["after_pruning_deactivation"] = after_pruning_metrics[
+                "deactivated"
+            ]
+            metrics[1]["after_pruning_sparsity"] = after_pruning_sparsity
 
         return metrics
 

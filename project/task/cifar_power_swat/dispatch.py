@@ -72,7 +72,11 @@ def dispatch_train(
         sparsity = cfg.get("task", {}).get("sparsity", 0.0)
         alpha = cfg.get("task", {}).get("alpha", 1.0)
         return (
-            get_train_and_prune(alpha=alpha, amount=sparsity, pruning_method="l1"),
+            get_train_and_prune(
+                alpha=alpha,
+                amount=sparsity,
+                pruning_method="l1",
+            ),
             test,
             get_fed_eval_fn,
         )
@@ -130,13 +134,18 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             Path(partition_dir),
         )
 
-        alpha: float = cfg.get("task", {}).get("alpha", 4)
-        sparsity: float = cfg.get("task", {}).get("sparsity", 0.7)
-
         # Case insensitive matches
         if client_model_and_data.upper() == "POWER_SWAT_RESNET":
+            alpha: float = cfg.get("task", {}).get("alpha", 4)
+            sparsity: float = cfg.get("task", {}).get("sparsity", 0.7)
+            num_classes: int = cfg.get("dataset", {}).get(
+                "num_classes",
+                10,
+            )
             return (
-                get_network_generator_resnet_swat(alpha=alpha, sparsity=sparsity),
+                get_network_generator_resnet_swat(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )
