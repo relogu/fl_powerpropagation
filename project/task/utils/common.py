@@ -21,8 +21,9 @@ from typing import Optional, Union
 
 import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
+import torch
 
-XY = tuple[np.ndarray, np.ndarray]
+XY = tuple[np.ndarray, np.ndarray] | tuple[torch.Tensor, torch.Tensor]  # speech command
 XYList = list[XY]
 PartitionedDataset = tuple[XYList, XYList]
 

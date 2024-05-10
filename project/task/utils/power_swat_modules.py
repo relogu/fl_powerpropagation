@@ -338,6 +338,7 @@ class SWATConv2D(nn.Module):
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha != 1.0:
+            print("alpha != 1.0")
             powerprop_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )

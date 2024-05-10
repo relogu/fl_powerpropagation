@@ -81,6 +81,17 @@ from project.task.cifar_zerofl.dispatch import (
     dispatch_train as dispatch_cifar_zeroFL_train,
 )
 
+# Speech command dispatch
+from project.task.speech_resnet18.dispatch import (
+    dispatch_config as dispatch_speech_resnet18_config,
+)
+from project.task.speech_resnet18.dispatch import (
+    dispatch_data as dispatch_speech_resnet18_data,
+)
+from project.task.speech_resnet18.dispatch import (
+    dispatch_train as dispatch_speech_resnet18_train,
+)
+
 
 from project.types.common import ConfigStructure, DataStructure, TrainStructure
 
@@ -113,6 +124,7 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
         dispatch_cifar_powerprop_train,
         dispatch_resnet18_train,
         dispatch_cifar_zeroFL_train,
+        dispatch_speech_resnet18_train,
     ]
 
     # Match the first function which does not return None
@@ -156,6 +168,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure:
         dispatch_cifar_power_swat_data,
         dispatch_resnet18_data,
         dispatch_cifar_zeroFL_data,
+        dispatch_speech_resnet18_data,
     ]
 
     # Match the first function which does not return None
@@ -199,6 +212,7 @@ def dispatch_config(cfg: DictConfig) -> ConfigStructure:
         dispatch_cifar_power_swat_config,
         dispatch_resnet18_config,
         dispatch_cifar_zeroFL_config,
+        dispatch_speech_resnet18_config,
     ]
 
     # Match the first function which does not return None
