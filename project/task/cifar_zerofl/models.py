@@ -96,10 +96,13 @@ def replace_layer_with_swat(
 
 
 def get_network_generator_resnet_swat(
-    alpha: float = 1.0, sparsity: float = 0.0, pruning_type: str = "unstructured"
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 10,
+    pruning_type: str = "unstructured",
 ) -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
-    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
 
     replace_layer_with_swat(
         module=untrained_net,
