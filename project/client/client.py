@@ -278,12 +278,15 @@ class Client(fl.client.NumPyClient):
             True,
             config.dataloader_config,
         )
+        # start_time = time.time()
         loss, num_samples, metrics = self.test(
             self.net,
             testloader,
             config.run_config,
             self.working_dir,
         )
+        # end_time = time.time() !?
+        # print(f"[client_{self.cid}] evaluation time: {end_time - start_time}")
 
         # Check, from the config, if the mask has to be used
         if config.extra["mask"]:

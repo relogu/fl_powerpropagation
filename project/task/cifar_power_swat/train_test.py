@@ -3,6 +3,7 @@
 from collections.abc import Sized
 from copy import deepcopy
 from pathlib import Path
+import time
 from typing import cast
 from collections.abc import Callable
 
@@ -271,6 +272,7 @@ def test(
 
     # print("Hi Alex, I am in test function")
 
+    start_time = time.time()
     with torch.no_grad():
         for images, labels in testloader:
             images, labels = (
@@ -286,12 +288,15 @@ def test(
             ).item()
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
+    elapsed_time = time.time() - start_time
+    # print(f"Elapsed time for testing: {elapsed_time}")
 
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
         len(cast(Sized, testloader.dataset)),
         {
             "test_accuracy": float(correct) / len(cast(Sized, testloader.dataset)),
+            "test_time": elapsed_time,
         },
     )
 

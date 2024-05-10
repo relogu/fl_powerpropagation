@@ -86,9 +86,10 @@ def replace_layer_with_powerprop(
 def get_network_generator_resnet_powerprop(
     alpha: float = 1.0,
     sparsity: float = 0.0,
+    num_classes: int = 10,
 ) -> Callable[[dict], NetCifarResnet18]:
     """Powerprop Resnet generator."""
-    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
 
     replace_layer_with_powerprop(
         module=untrained_net,

@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sized
 from pathlib import Path
+import time
 from typing import cast
 
 import logging
@@ -11,6 +12,7 @@ from project.task.cifar_powerprop.models import (
     get_parameters_to_prune,
 )
 
+from torch.cuda.amp import autocast, GradScaler
 
 import torch
 from pydantic import BaseModel
@@ -119,6 +121,88 @@ def train(  # pylint: disable=too-many-arguments
     }
 
 
+def mixed_precision_train(
+    net: nn.Module,
+    trainloader: DataLoader,
+    _config: dict,
+    _working_dir: Path,
+) -> tuple[int, dict]:
+    """Train the network on the training set.
+
+    Parameters
+    ----------
+    net : nn.Module
+        The neural network to train.
+    trainloader : DataLoader
+        The DataLoader containing the data to train the network on.
+    _config : dict
+        The configuration for the training.
+        Contains the device, number of epochs and learning rate.
+
+    Returns
+    -------
+    Tuple[int, dict]
+        The number of samples used for training,
+        the loss, and the accuracy of the input model on the given data.
+    """
+    if len(trainloader.dataset) == 0:
+        raise ValueError("Trainloader cannot be empty.")
+
+    config: TrainConfig = TrainConfig(**_config)
+    del _config
+
+    net.to(config.device)
+    net.train()
+
+    criterion = nn.CrossEntropyLoss()
+
+    optimizer = torch.optim.SGD(
+        net.parameters(),
+        lr=config.learning_rate,
+        weight_decay=0.001,
+    )
+
+    scaler = GradScaler()
+
+    final_epoch_per_sample_loss = 0.0
+    num_correct = 0
+
+    for _ in range(config.epochs):
+        final_epoch_per_sample_loss = 0.0
+        num_correct = 0
+
+        for data, target in trainloader:
+            data, target = data.to(config.device), target.to(config.device)
+
+            optimizer.zero_grad()
+
+            with autocast():
+                output = net(data)
+                loss = criterion(output, target)
+
+            final_epoch_per_sample_loss += loss.item()
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            num_correct += (output.argmax(1) == target).sum().item()
+
+        # Calculate epoch-wise metrics
+        train_loss = final_epoch_per_sample_loss / len(trainloader.dataset)
+        train_accuracy = num_correct / len(trainloader.dataset)
+
+        # print(
+        #     f"Epoch {epoch + 1}: Train Loss {train_loss:.4f}, Train Accuracy"
+        #     f" {train_accuracy:.4f}"
+        # )
+
+    return len(trainloader.dataset), {
+        "train_loss": train_loss,
+        "train_accuracy": train_accuracy,
+    }
+
+
 def get_train_and_prune(
     alpha: float = 1.0, amount: float = 0.0, pruning_method: str = "l1"
 ) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
@@ -144,6 +228,7 @@ def get_train_and_prune(
 
         # train the network, with the current parameter
         metrics = train(
+            # metrics = mixed_precision_train(
             net=net,
             trainloader=trainloader,
             _config=_config,
@@ -243,6 +328,7 @@ def test(
     criterion = nn.CrossEntropyLoss()
     correct, per_sample_loss = 0, 0.0
 
+    start_time = time.time()
     with torch.no_grad():
         for images, labels in testloader:
             images, labels = (
@@ -258,12 +344,15 @@ def test(
             ).item()
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
+    elapsed_time = time.time() - start_time
+    # print(f"Elapsed time for testing: {elapsed_time}")
 
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
         len(cast(Sized, testloader.dataset)),
         {
             "test_accuracy": float(correct) / len(cast(Sized, testloader.dataset)),
+            "test_time": elapsed_time,
         },
     )
 

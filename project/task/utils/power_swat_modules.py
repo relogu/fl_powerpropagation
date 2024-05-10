@@ -106,8 +106,9 @@ class swat_linear(Function):
                 output += bias
 
         topk = 1 - sparsity
-        if topk < 0.05:
+        if topk < 0.05:  # necassary since too small values create problem to drop !?
             topk = 0.05
+        # Must be decided a new treshold
 
         sparse_input = matrix_drop(input, topk)
 

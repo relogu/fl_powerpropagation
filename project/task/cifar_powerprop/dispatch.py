@@ -141,8 +141,14 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             )
             alpha = cfg.get("task", {}).get("alpha", 4.0)
             sparsity = cfg.get("task", {}).get("sparsity", 0.5)
+            num_classes: int = cfg.get("dataset", {}).get(
+                "num_classes",
+                10,
+            )
             return (
-                get_network_generator_resnet_powerprop(alpha=alpha, sparsity=sparsity),
+                get_network_generator_resnet_powerprop(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

@@ -133,17 +133,22 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             Path(partition_dir),
         )
 
-        alpha: float = cfg.get("task", {}).get("alpha", 1)
-        sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
-        # if the train structure is ZERO_FL_PRUNE, than reduce the sparsity
-
-        pruning_type: str = cfg.get("task", {}).get("pruning_type", "unstructured")
-
         # Case insensitive matches
         if client_model_and_data.upper() == "ZEROFL_RESNET":
+            alpha: float = cfg.get("task", {}).get("alpha", 1)
+            sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
+            # if the train structure is ZERO_FL_PRUNE, than reduce the sparsity
+            pruning_type: str = cfg.get("task", {}).get("pruning_type", "unstructured")
+            num_classes: int = cfg.get("dataset", {}).get(
+                "num_classes",
+                10,
+            )
             return (
                 get_network_generator_resnet_swat(
-                    alpha=alpha, sparsity=sparsity, pruning_type=pruning_type
+                    alpha=alpha,
+                    sparsity=sparsity,
+                    pruning_type=pruning_type,
+                    num_classes=num_classes,
                 ),
                 client_dataloader_gen,
                 fed_dataloater_gen,
