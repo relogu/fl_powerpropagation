@@ -65,8 +65,11 @@ def get_dataloader_generators(
 
         client_dir = partition_dir / f"client_{cid}"
         if not test:
+            # if True:
+            # print("Opening ", client_dir / "train.pt")
             dataset = torch.load(client_dir / "train.pt")
         else:
+            # print("Opening ", client_dir / "test.pt")
             dataset = torch.load(client_dir / "test.pt")
 
         dataset_loader = DataLoader(
@@ -100,15 +103,16 @@ def get_dataloader_generators(
         )
         del _config
 
-        if not test:
-            return DataLoader(
-                torch.load(partition_dir / "train.pt"),
-                batch_size=config.batch_size,
-                shuffle=not test,
-            )
+        # if not test:
+        #     return DataLoader(
+        #         torch.load(partition_dir / "train.pt"),
+        #         batch_size=config.batch_size,
+        #         shuffle=not test,
+        #     )
 
+        dataset = torch.load(partition_dir / "test.pt")
         return DataLoader(
-            torch.load(partition_dir / "test.pt"),
+            list(zip(dataset["data"], dataset["targets"], strict=True)),
             batch_size=config.batch_size,
             shuffle=not test,
         )
