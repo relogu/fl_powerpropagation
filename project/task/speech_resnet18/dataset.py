@@ -103,12 +103,12 @@ def get_dataloader_generators(
         )
         del _config
 
-        if not test:
-            return DataLoader(
-                torch.load(partition_dir / "train.pt"),
-                batch_size=config.batch_size,
-                shuffle=not test,
-            )
+        # if not test:
+        #     return DataLoader(
+        #         torch.load(partition_dir / "train.pt"),
+        #         batch_size=config.batch_size,
+        #         shuffle=not test,
+        #     )
 
         dataset = torch.load(partition_dir / "test.pt")
         return DataLoader(

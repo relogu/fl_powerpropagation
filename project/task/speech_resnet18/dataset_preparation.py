@@ -13,67 +13,9 @@ from torchaudio.datasets import SPEECHCOMMANDS
 
 
 from project.utils.utils import obtain_device
-from project.task.utils.common import XY, XYList, create_lda_partitions
+from project.task.utils.common import XYList, create_lda_partitions
 
 HYDRA_FULL_ERROR = 1
-
-
-class SubsetSC(SPEECHCOMMANDS):
-    """Subset of speech commands dataset.
-
-    Source:
-    """
-
-    def __init__(
-        self,
-        subset: str,
-        dataset_dir: Path = Path("./data/speech/data/"),
-    ) -> None:
-        dataset_dir.mkdir(parents=True, exist_ok=True)
-        dataset_dir = Path.resolve(dataset_dir)
-        super().__init__(str(dataset_dir), download=True)
-
-        dataset_dir = dataset_dir / "SpeechCommands/speech_commands_v0.02/"
-
-        def load_list(filename: Path) -> list[Path]:
-            """Return a list of file names."""
-            filepath = dataset_dir / filename
-            with open(filepath, encoding="utf-8") as fileobj:  # Add encoding argument
-                return [Path(dataset_dir) / line.strip() for line in fileobj]
-
-        if subset == "validation":
-            self._walker = load_list(Path("validation_list.txt"))
-        elif subset == "testing":
-            self._walker = load_list(Path("testing_list.txt"))
-        elif subset == "training":
-            excludes = set(
-                load_list(Path("validation_list.txt"))
-                + load_list(Path("testing_list.txt"))
-            )
-            self._walker = [w for w in self._walker if w not in excludes]
-
-
-def pad_sequence(batch: torch.Tensor) -> torch.Tensor:
-    """Pad a batch of variable length tensors with zeros."""
-    # Make all tensor in a batch the same length by padding with zeros
-    batch = [item.t() for item in batch]
-    batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True, padding_value=0.0)
-    return batch.permute(0, 2, 1)
-
-
-def label_to_index(labels: list[str], word: str) -> torch.Tensor:
-    """Return the position of the word in labels."""
-    # Return the position of the word in labels
-    return torch.tensor(labels.index(word))
-
-
-def index_to_label(labels: list[str], index: int) -> str:
-    """Return the word corresponding to the index in labels."""
-    # Return the word corresponding to the index in labels
-    # This is the inverse of label_to_index
-    return labels[index]
-
-
 labels = [
     "backward",
     "bed",
@@ -113,6 +55,104 @@ labels = [
 ]
 
 
+class SubsetSC(SPEECHCOMMANDS):
+    """Subset of speech commands dataset.
+
+    Source:
+    """
+
+    def __init__(
+        self,
+        dataset_dir: Path,
+        subset: str = "training",
+        # dataset_dir: Path = Path("./data/speech/data/"),
+    ) -> None:
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        dataset_dir = Path.resolve(dataset_dir)
+        super().__init__(str(dataset_dir), download=True)
+
+        dataset_dir = dataset_dir / "SpeechCommands/speech_commands_v0.02/"
+        # dataset_dir = dataset_dir
+
+        def load_list(filename: Path) -> list[Path]:
+            """Return a list of file names."""
+            filepath = dataset_dir / filename
+            with open(filepath, encoding="utf-8") as fileobj:  # Add encoding argument
+                return [Path(dataset_dir) / line.strip() for line in fileobj]
+
+        if subset == "validation":
+            self._walker = load_list(Path("validation_list.txt"))
+        elif subset == "testing":
+            self._walker = load_list(Path("testing_list.txt"))
+        elif subset == "training":
+            excludes = set(
+                load_list(Path("validation_list.txt"))
+                + load_list(Path("testing_list.txt"))
+            )
+            self._walker = [w for w in self._walker if w not in excludes]
+
+        # def load_list(filename):
+        #     filepath = os.path.join(self._path, filename)
+        #     with open(filepath) as fileobj:
+        #         return [
+        #             os.path.normpath(os.path.join(self._path, line.strip()))
+        #             for line in fileobj
+        #         ]
+
+        # if subset == "validation":
+        #     self._walker = load_list("validation_list.txt")
+        # elif subset == "testing":
+        #     self._walker = load_list("testing_list.txt")
+        # elif subset == "training":
+        #     excludes = load_list("validation_list.txt")+load_list("testing_list.txt")
+        #     excludes = set(excludes)
+        #     self._walker = [w for w in self._walker if w not in excludes]
+
+
+def pad_sequence(batch: torch.Tensor) -> torch.Tensor:
+    """Pad a batch of variable length tensors with zeros."""
+    # Make all tensor in a batch the same length by padding with zeros
+    batch = [item.t() for item in batch]
+    batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True, padding_value=0.0)
+    return batch.permute(0, 2, 1)
+
+
+def label_to_index(word: str) -> torch.Tensor:
+    """Return the position of the word in labels."""
+    # Return the position of the word in labels
+    return torch.tensor(labels.index(word))
+
+
+def index_to_label(index: int) -> str:
+    """Return the word corresponding to the index in labels.
+
+    This is the inverse of label_to_index
+    """
+    return labels[index]
+
+
+def collate_fn(
+    batch: list[tuple[torch.Tensor, int, str, str, int]]
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Collate a batch of data.
+
+    A data tuple has the form:
+    waveform, sample_rate, label, speaker_id, utterance_number
+    """
+    tensors, targets = [], []
+
+    # Gather in lists, and encode labels as indices
+    for waveform, _, label, *_ in batch:
+        tensors += [waveform]
+        targets += [label_to_index(label)]
+
+    # Group the list of tensors into a batched tensor
+    tensors = pad_sequence(tensors)
+    targets = torch.stack(targets)
+
+    return tensors, targets
+
+
 def _download_data(
     dataset_dir: Path,
 ) -> tuple[SPEECHCOMMANDS, SPEECHCOMMANDS]:
@@ -135,19 +175,20 @@ def _partition_data(
 ]:
     """Partition the dataset into training and testing set for each client."""
     # PARTITIONING THE TRAINING SET
-    tensors, targets = [], []
+    # tensors, targets = [], []
 
-    # Gather in lists, and encode labels as indices
-    for waveform, _, label, *_ in trainset:
-        tensors += [waveform]
-        targets += [label_to_index(labels=labels, word=label)]
+    # # Gather in lists, and encode labels as indices
+    # for waveform, _, label, *_ in trainset:
+    #     tensors += [waveform]
+    #     targets += [label_to_index(labels=labels, word=label)]
 
-    # Group the list of tensors into a batched tensor
-    tensors = pad_sequence(tensors)
-    targets = torch.stack(targets)
+    # # Group the list of tensors into a batched tensor
+    # tensors = pad_sequence(tensors)
+    # targets = torch.stack(targets)
 
     # Pack into a tuple
-    xy: XY = (tensors, targets)
+    # xy = (tensors, targets)
+    xy = collate_fn(trainset)
 
     # Create LDA partitions
     partitioned_trainset, dirichlet_dist = create_lda_partitions(
@@ -158,22 +199,23 @@ def _partition_data(
     )
 
     # PARTITIONING THE TEST SET
-    tensors, targets = [], []
-    # Gather in lists, and encode labels as indices
-    # for waveform, _, label, *_ in trainset:
+    # tensors, targets = [], []
+    # # Gather in lists, and encode labels as indices
+    # # for waveform, _, label, *_ in trainset:
 
-    # print("Untile here everithing is fine")
-    # for metadata in testset._walker:
-    #     print("Metadata:", metadata)
-    for waveform, _, label, *_ in testset:
-        tensors += [waveform]
-        targets += [label_to_index(labels=labels, word=label)]
+    # # print("Untile here everithing is fine")
+    # # for metadata in testset._walker:
+    # #     print("Metadata:", metadata)
+    # for waveform, _, label, *_ in testset:
+    #     tensors += [waveform]
+    #     targets += [label_to_index(word=label)]
 
-    # Group the list of tensors into a batched tensor
-    tensors = pad_sequence(tensors)
-    targets = torch.stack(targets)
+    # # Group the list of tensors into a batched tensor
+    # tensors = pad_sequence(tensors)
+    # targets = torch.stack(targets)
 
-    xy = (tensors, targets)
+    # xy = (tensors, targets)
+    xy = collate_fn(testset)
 
     partitioned_testset, _ = create_lda_partitions(
         dataset=xy,
@@ -238,10 +280,28 @@ def download_and_preprocess(cfg: DictConfig) -> None:
 
     # Save the centralised test set a centrailsed training set would also be possible
     # but is not used here
-    torch.save(testset, partition_dir / "test.pt")
+    testset = collate_fn(testset)
+    # print(type(testset))
+    # print(type(testset[0]))
+    # print(type(testset[1]))
+    # print(testset[0].shape)
+    # print(testset[1].shape)
+    # print(type(testset[0][0]))
+    # print(type(testset[1][0]))
+    # print(testset[0][0].shape)
+    # print(testset[1][0].shape)
+
+    # Extract data from fed_test_set
+    global_test_data = []
+    global_test_targets = []
+
+    # for client_test_set in fed_test_set:
+    #     client_data, client_targets = client_test_set
+    #     global_test_data.extend(client_data)
+    #     global_test_targets.extend(client_targets)
 
     for idx, client_dataset in enumerate(fed_train_set):
-        log(logging.INFO, len(client_dataset[0]))
+        log(logging.INFO, f"Client{idx}, num samples: {len(client_dataset[0])}")
         client_dir = partition_dir / f"client_{idx}"
         client_dir.mkdir(parents=True, exist_ok=True)
         # Saving the client trainset
@@ -254,12 +314,20 @@ def download_and_preprocess(cfg: DictConfig) -> None:
         }
         torch.save(subset_dict, client_dir / "test.pt")
 
-        # test_client_dataloader(
-        #     partition_dir,
-        #     idx,
-        #     64,
-        #     test=False,
-        # )
+        global_test_data.extend(fed_test_set[idx][0])
+        global_test_targets.extend(fed_test_set[idx][1])
+
+        test_client_dataloader(
+            partition_dir,
+            idx,
+            64,
+            test=False,
+        )
+    # Create the original test set
+    # subset_dict = {"data": global_test_data, "targets": global_test_targets}
+    subset_dict = {"data": testset[0], "targets": testset[1]}
+    torch.save(subset_dict, partition_dir / "test.pt")
+    test_federated_dataloader(partition_dir, 64, test=True)
 
 
 # TEST
@@ -298,8 +366,7 @@ def test_client_dataloader(
     )
 
     device = obtain_device()
-    # for data, target in list(zip(dataset['data'], dataset['targets'])):
-    # print(dataset['data'].shape)
+
     for data, target in dataset:
         data, target = (
             data.to(
@@ -308,6 +375,50 @@ def test_client_dataloader(
             target.to(device),
         )
         break
+
+    log(logging.INFO, f"Client {cid} dataset checked successfully")
+
+    return dataset
+
+
+def test_federated_dataloader(
+    partition_dir: Path,
+    batch_size: int,
+    test: bool,
+) -> DataLoader:
+    """Return a DataLoader for federated train/test sets.
+
+    Parameters
+    ----------
+    test : bool
+        Whether to load the test set or not
+    config : Dict
+        The configuration for the dataset
+
+    Returns
+    -------
+        DataLoader
+    """
+    dataset = torch.load(partition_dir / "test.pt")
+    dataset = DataLoader(
+        list(zip(dataset["data"], dataset["targets"], strict=True)),
+        # dataset,
+        batch_size=batch_size,
+        shuffle=not test,
+    )
+
+    device = obtain_device()
+
+    for data, target in dataset:
+        data, target = (
+            data.to(
+                device,
+            ),
+            target.to(device),
+        )
+        break
+
+    log(logging.INFO, "Test dataset checked successfully")
 
     return dataset
 

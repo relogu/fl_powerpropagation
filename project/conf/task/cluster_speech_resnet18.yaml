@@ -8,6 +8,9 @@ model_and_data: SPEECH_RESNET18
 train_structure: SPEECH_RESNET18_PS
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
+alpha: 1.0
+sparsity: 0.0
+
 # Client fit config
 fit_config:
   # Net does not require any configuration
@@ -28,7 +31,7 @@ eval_config:
   net_config: {}
   # The testing function batch size can be as high as the GPU supports
   dataloader_config:
-    batch_size: 16
+    batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
   extra: {mask: false}
@@ -49,5 +52,17 @@ fed_test_config:
 net_config_initial_parameters: {}
 
 # The names of metrics you wish to aggregate
-fit_metrics: [train_loss, train_accuracy]
-evaluate_metrics: [test_accuracy, noalpha_loss, noalpha_test_accuracy]
+fit_metrics:
+  - train_loss
+  - train_accuracy
+  - learning_rate
+  # - update_rate
+
+evaluate_metrics:
+  - test_accuracy
+  - nomask_test_accuracy
+  - nomask_loss
+  # - noalpha_loss
+  # - noalpha_test_accuracy
+  - sparsity
+  - test_time

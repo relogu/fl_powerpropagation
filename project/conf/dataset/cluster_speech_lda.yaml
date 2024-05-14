@@ -2,12 +2,12 @@
 name: speech_lda${dataset.lda_alpha}
 
 # Where to store data
-dataset_dir: ./data/speech/data
+dataset_dir: /datasets
 
 # Folder of client folders
 # indexed by id, containing train and test
 # data in .pt format
-partition_dir: ./data/speech/lda_${dataset.lda_alpha}
+partition_dir: /datasets/SpeechCommads/lda_${dataset.lda_alpha}
 
 # How many clients to create
 num_clients: 100
@@ -29,8 +29,8 @@ iid: false
 power_law: false
 
 lda: true
-# lda_alpha: 1000.0  # ? maybe shold be moved 
-lda_alpha: 1.0  # ? maybe shold be moved 
+lda_alpha: 1000.0  # ? maybe shold be moved 
+# lda_alpha: 1.0  # ? maybe shold be moved 
 
 # If the partition labels should be balanced
 balance: false

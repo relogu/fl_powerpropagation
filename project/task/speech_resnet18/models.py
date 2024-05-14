@@ -9,7 +9,7 @@ import torch.nn.functional as F
 
 from torch import nn
 from torchvision.models import resnet18
-from project.task.utils.powerprop_modules import PowerPropConv1D, PowerPropLinear
+from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
 
 
 class M5(nn.Module):
@@ -181,7 +181,7 @@ def init_weights(module: nn.Module) -> None:
     """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
     if isinstance(
         module,
-        PowerPropLinear | PowerPropConv1D | nn.Linear | nn.Conv2d,
+        PowerPropLinear | PowerPropConv2D | nn.Linear | nn.Conv2d,
     ):
         # Your code here
         fan_in = calculate_fan_in(module.weight.data)
@@ -196,7 +196,7 @@ def init_weights(module: nn.Module) -> None:
         if (
             isinstance(
                 module,
-                PowerPropLinear | PowerPropConv1D,
+                PowerPropLinear | PowerPropConv2D,
             )
             and module.alpha > 1
         ):
@@ -235,7 +235,7 @@ def replace_layer_with_powerprop(
     for attr_str in dir(module):
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv1d:
-            new_conv = PowerPropConv1D(
+            new_conv = PowerPropConv2D(
                 alpha=alpha,
                 sparsity=sparsity,
                 in_channels=target_attr.in_channels,
@@ -296,9 +296,6 @@ def get_resnet18(
     # untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
     # untrained_net: NetCifarResnet18 = M5(n_input=1,n_output=35,stride=16,n_channel=32)
     untrained_net: NetCifarResnet18 = SpeechResModel()
-    # untrained_net.load_state_dict(
-    #     generate_random_state_dict(untrained_net, seed=42, sparsity=0.9)
-    # )
 
     # replace_layer_with_powerprop(
     #     module=untrained_net,
