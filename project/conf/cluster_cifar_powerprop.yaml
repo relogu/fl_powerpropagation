@@ -43,6 +43,7 @@ test_clients:
 wandb:
   setup:
     project: powerprop_alpha
+    # project: powerprop_alpha
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
