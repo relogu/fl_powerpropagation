@@ -2,12 +2,12 @@
 name: speech_lda${dataset.lda_alpha}
 
 # Where to store data
-dataset_dir: /datasets
+dataset_dir: /datasets/ag2411
 
 # Folder of client folders
 # indexed by id, containing train and test
 # data in .pt format
-partition_dir: /datasets/SpeechCommads/lda_${dataset.lda_alpha}
+partition_dir: /datasets/ag2411/SpeechCommands/lda_${dataset.lda_alpha}
 
 # How many clients to create
 num_clients: 100

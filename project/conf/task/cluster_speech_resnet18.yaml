@@ -8,8 +8,8 @@ model_and_data: SPEECH_RESNET18
 train_structure: SPEECH_RESNET18_PS
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
-alpha: 1.0
-sparsity: 0.0
+alpha: 1.25
+sparsity: 0.9
 
 # Client fit config
 fit_config:
@@ -17,7 +17,7 @@ fit_config:
   net_config: {}
   # Dataloader requires batch_size
   dataloader_config:
-    batch_size: 16
+    batch_size: 8
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1

@@ -64,8 +64,14 @@ def dispatch_train(
 
     # Only consider not None and uppercase matches
     if train_structure is not None and train_structure.upper() == "SPEECH_RESNET18_PS":
-        alpha = 1.0
-        sparsity = 0.0
+        alpha: float = cfg.get("task", {}).get(
+            "alpha",
+            1.25,
+        )
+        sparsity: float = cfg.get("task", {}).get(
+            "sparsity",
+            0.95,
+        )
         return (
             # train,
             get_train_and_prune(alpha=alpha, amount=sparsity, pruning_method="l1"),
@@ -128,12 +134,14 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
 
         # Case insensitive matches
         if client_model_and_data.upper() == "SPEECH_RESNET18":
+            alpha: float = cfg.get("task", {}).get("alpha", 1.0)
+            sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
             num_classes: int = cfg.get("dataset", {}).get(
                 "num_classes",
                 35,
             )
             return (
-                get_resnet18(num_classes=num_classes),
+                get_resnet18(alpha=alpha, sparsity=sparsity, num_classes=num_classes),
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )

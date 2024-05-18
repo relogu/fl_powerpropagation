@@ -22,7 +22,7 @@ from project.task.default.train_test import (
 )
 
 from torch.nn.utils import prune
-from project.task.cifar_powerprop.models import (
+from project.task.speech_resnet18.models import (
     get_parameters_to_prune,
 )
 
@@ -124,7 +124,6 @@ def train(  # pylint: disable=too-many-arguments
 
             data = transform(data)
 
-            # print("Shape of input data:", data.shape)
             if data.shape[0] != 1:
                 optimizer.zero_grad()
                 output = net(data)
@@ -135,6 +134,12 @@ def train(  # pylint: disable=too-many-arguments
                 )
                 loss.backward()
                 optimizer.step()
+
+                # Clear gradients to save memory
+                optimizer.zero_grad()  # ? not sure if this is needed
+                torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
 
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
@@ -174,23 +179,18 @@ def get_train_and_prune(
             _config=_config,
             _working_dir=_working_dir,
         )
-        base_alpha = 1.0
-        num_pruning_round = 1000
-        # num_scales = 5
-        # sparsity_range = 1 - amount
+
+        # Used for ZeroFL
         # sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
         sparsity_inc = 0
 
-        # print(f"[client_{_config['cid']}]sparsity_inc: {sparsity_inc}")
-
-        if (
-            _config["curr_round"] < num_pruning_round or alpha == base_alpha
-        ) and amount > 0:
+        if amount > 0:
             """
             The net must be pruned:
             - at the first round if we are using powerprop
             - every round if we are not using powerprop (alpha=1.0)
             """
+            torch.cuda.empty_cache()
             parameters_to_prune = get_parameters_to_prune(net)
 
             prune.global_unstructured(
@@ -204,10 +204,9 @@ def get_train_and_prune(
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
 
+            # Delete all residual variables and empty the cache
             del parameters_to_prune
-            # torch.cuda.empty_cache()
-
-        # get the amount of parameters to prune from the first module that has sparsity
+            torch.cuda.empty_cache()
 
         return metrics
 

@@ -471,11 +471,11 @@ def print_nonzeros(model: nn.Module, msg: str = "") -> float:
         nonzero += nz_count
         total += total_params
 
-    # log(
-    #     logging.INFO,
-    #     f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
-    #     f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
-    # )
+    log(
+        logging.INFO,
+        f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
+        f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
+    )
     return round(((total - nonzero) / total) * 100, 3)
 
 
