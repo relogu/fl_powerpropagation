@@ -12,7 +12,6 @@ import pickle
 import flwr as fl
 from flwr.common import NDArrays
 from flwr.common.logger import log
-import numpy as np
 from pydantic import BaseModel
 from torch import nn
 
@@ -131,20 +130,20 @@ class Client(fl.client.NumPyClient):
         # print(f"[client_{self.cid}] current_round: ", config.extra["curr_round"])
 
         # Check, from the config, if the mask has to be used
-        if config.extra["mask"]:
-            mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-            if mask_path.exists():
-                with open(mask_path, "rb") as f:
-                    mask = pickle.load(f)
-                noise = [
-                    np.random.rand(*param.shape) < config.extra["noise"] * (1 - m)
-                    for param, m in zip(parameters, mask, strict=True)
-                ]
-                # Apply the mask and the noise to the parameters
-                parameters = [
-                    param * (m + n)
-                    for param, m, n in zip(parameters, mask, noise, strict=True)
-                ]
+        # if config.extra["mask"]:
+        #     mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+        #     if mask_path.exists():
+        #         with open(mask_path, "rb") as f:
+        #             mask = pickle.load(f)
+        #         noise = [
+        #             np.random.rand(*param.shape) < config.extra["noise"] * (1 - m)
+        #             for param, m in zip(parameters, mask, strict=True)
+        #         ]
+        #         # Apply the mask and the noise to the parameters
+        #         parameters = [
+        #             param * (m + n)
+        #             for param, m, n in zip(parameters, mask, noise, strict=True)
+        #         ]
 
         self.net = self.set_parameters(
             parameters,
@@ -157,7 +156,7 @@ class Client(fl.client.NumPyClient):
             config.dataloader_config,
         )
 
-        tot_rounds = 700
+        tot_rounds = 500
 
         # FROM ZEROFL
         def update_learing_rate(
@@ -216,13 +215,13 @@ class Client(fl.client.NumPyClient):
         trained_parameters = generic_get_parameters(self.net)
 
         # Check if the mask has been used
-        if config.extra["mask"]:
-            # Estract the mask from the parameters
-            mask = [param != 0 for param in trained_parameters]
-            # Save the mask in the output dir
-            mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-            with open(mask_path, "wb") as fw:
-                pickle.dump(mask, fw)
+        # if config.extra["mask"]:
+        #     # Estract the mask from the parameters
+        #     mask = [param != 0 for param in trained_parameters]
+        #     # Save the mask in the output dir
+        #     mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+        #     with open(mask_path, "wb") as fw:
+        #         pickle.dump(mask, fw)
 
         metrics["learning_rate"] = config.run_config["learning_rate"]
 

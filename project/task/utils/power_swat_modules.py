@@ -34,6 +34,8 @@ from project.task.utils.drop import (
 
 torch.autograd.set_detect_anomaly(True)
 
+top_k_threshold = 0.01
+
 
 def convolution_backward(
     ctx,
@@ -106,8 +108,10 @@ class swat_linear(Function):
                 output += bias
 
         topk = 1 - sparsity
-        if topk < 0.05:  # necassary since too small values create problem to drop !?
-            topk = 0.05
+        if (
+            topk < top_k_threshold
+        ):  # necassary since too small values create problem to drop !?
+            topk = top_k_threshold
         # Must be decided a new treshold
 
         sparse_input = matrix_drop(input, topk)
@@ -201,6 +205,12 @@ class swat_conv2d(Function):
         dilation,
         groups,
     ):
+        # Ensure input tensor is contiguous
+        input = input.contiguous()
+        # weight = weight.contiguous()
+        # if bias is not None:
+        #     bias = bias.contiguous()
+
         output = F.conv2d(
             input=input,
             weight=weight,
@@ -222,8 +232,8 @@ class swat_conv2d(Function):
 
         topk = 1 - sparsity
         # necassary since too small values create problem to drop !???
-        if topk < 0.05:
-            topk = 0.05
+        if topk < top_k_threshold:
+            topk = top_k_threshold
 
         sparse_input = matrix_drop(input, topk)
         if in_threshold < 0.0:
@@ -248,7 +258,7 @@ class swat_conv2d(Function):
     @once_differentiable
     # def backward(ctx, grad_output, grad_wt_th, grad_in_th):
     def backward(ctx, grad_output, grad_in_th):
-        # grad_output = grad_output.contiguous()
+        grad_output = grad_output.contiguous()
         return convolution_backward(ctx, grad_output)
 
 
@@ -339,7 +349,6 @@ class SWATConv2D(nn.Module):
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha != 1.0:
-            print("alpha != 1.0")
             powerprop_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )

@@ -15,6 +15,12 @@ from project.task.utils.powerprop_modules import (
     PowerPropLinear,
 )
 
+from project.task.utils.power_swat_modules import SWATConv2D as PowerSwatConv2D
+from project.task.utils.power_swat_modules import SWATLinear as PowerSwatLinear
+
+from project.task.utils.swat_modules import SWATConv2D as ZeroflSwatConv2D
+from project.task.utils.swat_modules import SWATLinear as ZeroflSwatLinear
+
 
 class M5(nn.Module):
     """M5 model from pytorch tutorial on Speech Command."""
@@ -101,85 +107,6 @@ class NetCifarResnet18(nn.Module):
         return self.net(x)
 
 
-# from: https://github.com/castorini/honk/blob/master/utils/model.py
-class SerializableModule(nn.Module):
-    """A serializable module."""
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def save(self, filename: str) -> None:
-        """Save the model to a file."""
-        torch.save(self.state_dict(), filename)
-
-    def load(self, filename: str) -> None:
-        """Load the model from a file."""
-        self.load_state_dict(
-            torch.load(filename, map_location=lambda storage, _: storage)
-        )
-
-
-class SpeechResModel(SerializableModule):
-    """A ResNet18 adapted to Speech Commands."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        n_labels = 35
-        n_maps = 64  # config["n_feature_maps"]
-        self.conv0 = nn.Conv2d(1, n_maps, (3, 3), padding=(1, 1), bias=False)
-
-        # self.pool = nn.AvgPool2d(config["res_pool"])
-
-        self.n_layers = n_layers = 7  # config["n_layers"]
-        dilation = True  # config["use_dilation"]
-        if dilation:
-            self.convs = [
-                nn.Conv2d(
-                    n_maps,
-                    n_maps,
-                    (3, 3),
-                    padding=int(2 ** (i // 3)),
-                    dilation=int(2 ** (i // 3)),
-                    bias=False,
-                )
-                for i in range(n_layers)
-            ]
-        else:
-            self.convs = [
-                nn.Conv2d(n_maps, n_maps, (3, 3), padding=1, dilation=1, bias=False)
-                for _ in range(n_layers)
-            ]
-        for i, conv in enumerate(self.convs):
-            self.add_module(f"bn{i + 1}", nn.BatchNorm2d(n_maps, affine=False))
-            self.add_module(f"conv{i + 1}", conv)
-        self.output = nn.Linear(n_maps, n_labels)
-
-        # for name, layer in self.named_children():
-        #     print(name, layer)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass."""
-        x = x.unsqueeze(1)
-        for i in range(self.n_layers + 1):
-            y = F.relu(getattr(self, f"conv{i}")(x))
-            if i == 0:
-                if hasattr(self, "pool"):
-                    y = self.pool(y)
-                old_x = y
-            if i > 0 and i % 2 == 0:
-                x = y + old_x
-                old_x = x
-            else:
-                x = y
-            if i > 0:
-                x = getattr(self, f"bn{i}")(x)
-        x = x.view(x.size(0), x.size(1), -1)  # shape: (batch, feats, o3)
-        x = torch.mean(x, 2)
-        return self.output(x)
-
-
-# From pollen: https://github.com/relogu/pollen_worker/.../models/resnet_util.py
-
 # get_resnet18: NetGen = lazy_config_wrapper(NetCifarResnet18)
 
 
@@ -190,6 +117,10 @@ def init_weights(module: nn.Module) -> None:
         PowerPropLinear
         | PowerPropConv2D
         | PowerPropConv1D
+        | PowerSwatLinear
+        | PowerSwatConv2D
+        | ZeroflSwatLinear
+        | ZeroflSwatConv2D
         | nn.Linear
         | nn.Conv2d
         | nn.Conv1d,
@@ -202,7 +133,13 @@ def init_weights(module: nn.Module) -> None:
         if (
             isinstance(
                 module,
-                PowerPropLinear | PowerPropConv2D | PowerPropConv1D,
+                PowerPropLinear
+                | PowerPropConv2D
+                | PowerPropConv1D
+                | PowerSwatLinear
+                | PowerSwatConv2D
+                | ZeroflSwatLinear
+                | ZeroflSwatConv2D,
             )
             and module.alpha > 1
         ):
@@ -266,6 +203,86 @@ def replace_layer_with_powerprop(
         replace_layer_with_powerprop(immediate_child_module, model, alpha, sparsity)
 
 
+def replace_layer_with_zero_fl(
+    module: nn.Module,
+    name: str = "Model",
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    pruning_type: str = "unstructured",
+) -> None:
+    """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
+    for attr_str in dir(module):
+        target_attr = getattr(module, attr_str)
+        if type(target_attr) == nn.Conv2d:
+            new_conv = ZeroflSwatConv2D(
+                alpha=alpha,
+                in_channels=target_attr.in_channels,
+                out_channels=target_attr.out_channels,
+                kernel_size=target_attr.kernel_size[0],
+                bias=target_attr.bias is not None,
+                padding=target_attr.padding,
+                stride=target_attr.stride,
+                sparsity=sparsity,
+                pruning_type=pruning_type,
+                warm_up=0,
+                period=1,
+            )
+            setattr(module, attr_str, new_conv)
+            # print(f"Replaced {type(target_attr)} with SWATConv2D in {name}")
+        if type(target_attr) == nn.Linear:
+            new_conv = ZeroflSwatLinear(
+                alpha=alpha,
+                in_features=target_attr.in_features,
+                out_features=target_attr.out_features,
+                bias=target_attr.bias is not None,
+                sparsity=sparsity,
+            )
+            setattr(module, attr_str, new_conv)
+            # print(f"Replaced {type(target_attr)} with SWATLinear in {name}")
+
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_zero_fl(immediate_child_module, model, alpha, sparsity)
+
+
+def replace_layer_with_power_swat(
+    module: nn.Module,
+    name: str = "Model",
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    pruning_type: str = "unstructured",
+) -> None:
+    """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
+    for attr_str in dir(module):
+        target_attr = getattr(module, attr_str)
+        if type(target_attr) == nn.Conv2d:
+            new_conv = PowerSwatConv2D(
+                alpha=alpha,
+                in_channels=target_attr.in_channels,
+                out_channels=target_attr.out_channels,
+                kernel_size=target_attr.kernel_size[0],
+                bias=target_attr.bias is not None,
+                padding=target_attr.padding,
+                stride=target_attr.stride,
+                sparsity=sparsity,
+                pruning_type=pruning_type,
+                warm_up=0,
+                period=1,
+            )
+            setattr(module, attr_str, new_conv)
+        if type(target_attr) == nn.Linear:
+            new_conv = PowerSwatLinear(
+                alpha=alpha,
+                in_features=target_attr.in_features,
+                out_features=target_attr.out_features,
+                bias=target_attr.bias is not None,
+                sparsity=sparsity,
+            )
+            setattr(module, attr_str, new_conv)
+
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_power_swat(immediate_child_module, model, alpha, sparsity)
+
+
 def calculate_fan_in(tensor: torch.Tensor) -> float:
     """Calculate fan in.
 
@@ -289,22 +306,106 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
 
 
 def get_resnet18(
+    num_classes: int = 35,
+    n_input: int = 1,
+) -> Callable[[dict], NetCifarResnet18]:
+    """Resnet18 network generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(
+        num_classes=num_classes, n_input=n_input
+    )
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
+
+    def generated_net(_config: dict) -> NetCifarResnet18:
+        return deepcopy(untrained_net)
+
+    return generated_net
+
+
+def get_powerprop_resnet18(
     alpha: float = 1.0,
     sparsity: float = 0.0,
     num_classes: int = 35,
     pruning_type: str = "unstructured",
 ) -> Callable[[dict], NetCifarResnet18]:
-    """Cifar Resnet18 network generatror."""
+    """Cifar Resnet18 network generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
-    # untrained_net: NetCifarResnet18 = M5(n_input=1,n_output=35,stride=16,n_channel=32)
-    # untrained_net: NetCifarResnet18 = SpeechResModel()
-
+    # Modify the network based on the specified parameters
     replace_layer_with_powerprop(
         module=untrained_net,
         name="NetCifarResnet18",
         alpha=alpha,
         sparsity=sparsity,
-        # pruning_type=pruning_type,
+    )
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
+
+    def generated_net(_config: dict) -> NetCifarResnet18:
+        return deepcopy(untrained_net)
+
+    return generated_net
+
+
+def get_powerswat_resnet18(
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 35,
+    pruning_type: str = "unstructured",
+) -> Callable[[dict], NetCifarResnet18]:
+    """Powerswat Resnet18 network generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
+    # Modify the network based on the specified parameters
+    replace_layer_with_power_swat(
+        module=untrained_net,
+        name="NetCifarResnet18",
+        alpha=alpha,
+        sparsity=sparsity,
+    )
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
+
+    def generated_net(_config: dict) -> NetCifarResnet18:
+        return deepcopy(untrained_net)
+
+    return generated_net
+
+
+def get_zerofl_resnet18(
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 35,
+    pruning_type: str = "unstructured",
+) -> Callable[[dict], NetCifarResnet18]:
+    """Zerofl Resnet18 network generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
+    # Modify the network based on the specified parameters
+    replace_layer_with_zero_fl(
+        module=untrained_net,
+        name="NetCifarResnet18",
+        alpha=alpha,
+        sparsity=sparsity,
+        pruning_type=pruning_type,
     )
 
     def init_model(
@@ -343,6 +444,10 @@ def get_parameters_to_prune(
             type(module) == PowerPropConv2D
             or type(module) == PowerPropConv1D
             or type(module) == PowerPropLinear
+            or type(module) == PowerSwatConv2D
+            or type(module) == PowerSwatLinear
+            or type(module) == ZeroflSwatConv2D
+            or type(module) == ZeroflSwatLinear
             or type(module) == nn.Conv2d
             or type(module) == nn.Conv1d
             or type(module) == nn.Linear

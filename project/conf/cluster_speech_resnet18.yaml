@@ -51,7 +51,7 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: resnet18-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
+    name: ${task.model_and_data}-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
 
 # For Ray cluster usage
 # leave null unless you need 

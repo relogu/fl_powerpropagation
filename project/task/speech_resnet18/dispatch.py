@@ -23,7 +23,12 @@ from omegaconf import DictConfig
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.speech_resnet18.dataset import get_dataloader_generators
-from project.task.speech_resnet18.models import get_resnet18
+from project.task.speech_resnet18.models import (
+    get_resnet18,
+    get_powerprop_resnet18,
+    get_powerswat_resnet18,
+    get_zerofl_resnet18,
+)
 from project.task.speech_resnet18.train_test import (
     get_fed_eval_fn,
     test,
@@ -133,15 +138,40 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         )
 
         # Case insensitive matches
+        # Case insensitive matches
+        alpha: float = cfg.get("task", {}).get("alpha", 1.0)
+        sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
+        num_classes: int = cfg.get("dataset", {}).get(
+            "num_classes",
+            35,
+        )
         if client_model_and_data.upper() == "SPEECH_RESNET18":
-            alpha: float = cfg.get("task", {}).get("alpha", 1.0)
-            sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
-            num_classes: int = cfg.get("dataset", {}).get(
-                "num_classes",
-                35,
-            )
             return (
-                get_resnet18(alpha=alpha, sparsity=sparsity, num_classes=num_classes),
+                get_resnet18(num_classes=num_classes),
+                client_dataloader_gen,
+                fed_dataloader_gen,
+            )
+        if client_model_and_data.upper() == "SPEECH_PP":
+            return (
+                get_powerprop_resnet18(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
+                client_dataloader_gen,
+                fed_dataloader_gen,
+            )
+        if client_model_and_data.upper() == "SPEECH_PPSWAT":
+            return (
+                get_powerswat_resnet18(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
+                client_dataloader_gen,
+                fed_dataloader_gen,
+            )
+        if client_model_and_data.upper() == "SPEECH_ZERO":
+            return (
+                get_zerofl_resnet18(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )

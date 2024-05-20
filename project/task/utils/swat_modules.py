@@ -245,6 +245,7 @@ class swat_conv2d(Function):
 
         # print(f"[forward.conv] input: {print_nonzeros_tensor(input)} ")
         # print(f"[forward.conv] weight: {print_nonzeros_tensor(weight)} ")
+        input = input.contiguous()
 
         output = F.conv2d(
             input=input,
