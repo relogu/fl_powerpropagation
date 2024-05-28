@@ -194,6 +194,7 @@ exclude = [
     "node_modules",
     "venv",
     "proto",
+    "plotting/plots",
     "project/task/utils",
     "project/fed/server/strategy",
 ]
