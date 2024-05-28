@@ -54,6 +54,13 @@ def generic_set_parameters(
         {k: torch.tensor(v if not to_copy else v.copy()) for k, v in params_dict},
     )
 
+    # with torch.no_grad():
+    #     for param, new_param in zip(net.parameters(), parameters, strict=True):
+    #         if to_copy:
+    #             param.copy_(torch.from_numpy(new_param))
+    #         else:
+    #             param.copy_(torch.from_numpy(new_param).detach())
+
     net.load_state_dict(state_dict)
 
 
@@ -74,6 +81,11 @@ def generic_get_parameters(net: nn.Module) -> NDArrays:
         net.state_dict().items(), key=lambda x: x[0]
     )  # Sort by keys
     parameters = [val.cpu().numpy() for _, val in state_dict_items]
+
+    # parameters = []
+    # with torch.no_grad():
+    #     for param in net.parameters():
+    #         parameters.append(param.detach().cpu().numpy())
 
     return parameters
 

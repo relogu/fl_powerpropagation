@@ -2,10 +2,10 @@
 # These strings are constants used by the dispatcher to select functionality at runtime
 # Please implement all behaviour in the task-level dispatch.py file and then add the dispatch functions to the top-level dispatch.py
 # Choose the model and dataset
-# model_and_data: SPEECH_RESNET18
+model_and_data: SPEECH_RESNET18
 # model_and_data: SPEECH_PP
 # model_and_data: SPEECH_PPSWAT
-model_and_data: SPEECH_ZERO
+# model_and_data: SPEECH_ZERO
 
 # Choose the train, test and server fed_eval functions
 train_structure: SPEECH_RESNET18_PS
@@ -13,6 +13,7 @@ train_structure: SPEECH_RESNET18_PS
 
 alpha: 1.25
 sparsity: 0.9
+mask: 0.0
 
 # Client fit config
 fit_config:
@@ -26,6 +27,7 @@ fit_config:
     epochs: 1
     learning_rate: 0.1
     final_learning_rate: 0.01
+    tot_rounds: 500
   # No extra config
   extra: {mask: false}
 

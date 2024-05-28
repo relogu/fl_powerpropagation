@@ -23,6 +23,7 @@ fit_config:
     epochs: 1
     learning_rate: 0.3
     final_learning_rate: 0.01
+    tot_rounds: 500
   # No extra config
   extra: {mask: false, noise: 0.1}
 

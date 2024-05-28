@@ -209,11 +209,15 @@ def replace_layer_with_zero_fl(
     alpha: float = 1.0,
     sparsity: float = 0.0,
     pruning_type: str = "unstructured",
+    first_layer: bool = True,
 ) -> None:
     """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
     for attr_str in dir(module):
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:
+            if first_layer:
+                first_layer = False
+                continue
             new_conv = ZeroflSwatConv2D(
                 alpha=alpha,
                 in_channels=target_attr.in_channels,
@@ -230,6 +234,9 @@ def replace_layer_with_zero_fl(
             setattr(module, attr_str, new_conv)
             # print(f"Replaced {type(target_attr)} with SWATConv2D in {name}")
         if type(target_attr) == nn.Linear:
+            if first_layer:
+                first_layer = False
+                continue
             new_conv = ZeroflSwatLinear(
                 alpha=alpha,
                 in_features=target_attr.in_features,
@@ -241,7 +248,13 @@ def replace_layer_with_zero_fl(
             # print(f"Replaced {type(target_attr)} with SWATLinear in {name}")
 
     for model, immediate_child_module in module.named_children():
-        replace_layer_with_zero_fl(immediate_child_module, model, alpha, sparsity)
+        replace_layer_with_zero_fl(
+            immediate_child_module,
+            name=model,
+            alpha=alpha,
+            sparsity=sparsity,
+            first_layer=first_layer,
+        )
 
 
 def replace_layer_with_power_swat(

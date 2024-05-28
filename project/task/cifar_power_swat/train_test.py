@@ -48,6 +48,7 @@ class TrainConfig(BaseModel):
     learning_rate: float
     final_learning_rate: float  # ? to remove
     curr_round: int = 0
+    # total_rounds: int = 500
 
     class Config:
         """Setting to allow any types, including library ones like torch.device."""

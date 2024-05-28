@@ -136,10 +136,8 @@ def train(  # pylint: disable=too-many-arguments
                 optimizer.step()
 
                 # Clear gradients to save memory
-                optimizer.zero_grad()  # ? not sure if this is needed
-                torch.cuda.empty_cache()
-            # torch.cuda.empty_cache()
-        # torch.cuda.empty_cache()
+                # optimizer.zero_grad()  # ? not sure if this is needed
+    torch.cuda.empty_cache()
 
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
@@ -183,6 +181,7 @@ def get_train_and_prune(
         # Used for ZeroFL
         # sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
         sparsity_inc = 0
+        # print(f"Amount: {amount}, Sparsity Inc: {sparsity_inc}")
 
         if amount > 0:
             """
@@ -190,7 +189,7 @@ def get_train_and_prune(
             - at the first round if we are using powerprop
             - every round if we are not using powerprop (alpha=1.0)
             """
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
             parameters_to_prune = get_parameters_to_prune(net)
 
             prune.global_unstructured(
@@ -205,7 +204,7 @@ def get_train_and_prune(
                 prune.remove(module, name)
 
             # Delete all residual variables and empty the cache
-            del parameters_to_prune
+            # del parameters_to_prune
             torch.cuda.empty_cache()
 
         return metrics
@@ -284,8 +283,6 @@ def test(
 
             images = transform(images)
 
-            # print("Shape of input data:", images.shape)
-
             outputs = net(images)
             per_sample_loss += criterion(
                 outputs.squeeze(),
@@ -293,6 +290,9 @@ def test(
             ).item()
             _, predicted = torch.max(outputs.squeeze().data, 1)
             correct += (predicted == labels).sum().item()
+
+            # del images, labels, outputs, predicted
+    torch.cuda.empty_cache()
 
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
@@ -367,6 +367,9 @@ def get_fed_eval_fn(
             config.run_config,
             working_dir,
         )
+
+        torch.cuda.empty_cache()
+
         return loss, metrics
 
     return fed_eval_fn

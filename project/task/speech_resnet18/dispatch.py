@@ -77,6 +77,9 @@ def dispatch_train(
             "sparsity",
             0.95,
         )
+        # the sparsity must be modified to include the mask
+        mask = cfg.get("task", {}).get("mask", 0.0)
+        sparsity = sparsity - mask
         return (
             # train,
             get_train_and_prune(alpha=alpha, amount=sparsity, pruning_method="l1"),

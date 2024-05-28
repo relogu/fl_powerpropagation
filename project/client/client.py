@@ -6,7 +6,6 @@ Make sure the model and dataset are not loaded before the fit function.
 import logging
 import math
 from pathlib import Path
-import pickle
 
 
 import flwr as fl
@@ -54,6 +53,21 @@ class ClientConfig(BaseModel):
         """Setting to allow any types, including library ones like torch.device."""
 
         arbitrary_types_allowed = True
+
+
+# FROM ZEROFL
+def update_learing_rate(
+    inittial_value: float,
+    final_value: float,
+    curr_round: int,
+    total_rounds: int = 500,
+) -> float:
+    """Update the learning rate using the exponential decay."""
+    ratio = final_value / inittial_value
+    log_ratio = math.log(ratio)
+    exponential_term = (curr_round / total_rounds) * log_ratio
+    eta_t = inittial_value * math.exp(exponential_term)
+    return eta_t
 
 
 class Client(fl.client.NumPyClient):
@@ -150,34 +164,22 @@ class Client(fl.client.NumPyClient):
             config.net_config,
         )
 
+        del parameters
+
         trainloader = self.dataloader_gen(
             self.cid,
             False,
             config.dataloader_config,
         )
 
-        tot_rounds = 500
-
-        # FROM ZEROFL
-        def update_learing_rate(
-            inittial_value: float,
-            final_value: float,
-            curr_round: int,
-            total_rounds: int = tot_rounds,
-        ) -> float:
-            """Update the learning rate using the exponential decay."""
-            ratio = final_value / inittial_value
-            log_ratio = math.log(ratio)
-            exponential_term = (curr_round / total_rounds) * log_ratio
-            eta_t = inittial_value * math.exp(exponential_term)
-            return eta_t
+        # tot_rounds = 1000
 
         # config.run_config["learning_rate"] = _interpolate_initial_final_value(
         config.run_config["learning_rate"] = update_learing_rate(
             inittial_value=config.run_config["learning_rate"],
             final_value=config.run_config["final_learning_rate"],
             curr_round=config.run_config["curr_round"],
-            total_rounds=tot_rounds,
+            # total_rounds=config.run_config["total_rounds"],
             # total_rounds=config.extra["total_rounds"]
         )
 
@@ -188,17 +190,17 @@ class Client(fl.client.NumPyClient):
             f"[client_{self.cid}] lr: {config.run_config['learning_rate']}",
         )
 
-        def _changing_sparsity(net: nn.Module, sparsity: float) -> None:
-            """Change the sparsity of the SWAT layers."""
-            for module in net.modules():
-                if hasattr(module, "sparsity"):
-                    module.sparsity = sparsity
+        # def _changing_sparsity(net: nn.Module, sparsity: float) -> None:
+        #     """Change the sparsity of the SWAT layers."""
+        #     for module in net.modules():
+        #         if hasattr(module, "sparsity"):
+        #             module.sparsity = sparsity
 
-        def _changing_alpha(net: nn.Module, alpha: float) -> None:
-            """Change the alpha of the SWAT layers."""
-            for module in net.modules():
-                if hasattr(module, "alpha"):
-                    module.alpha = alpha
+        # def _changing_alpha(net: nn.Module, alpha: float) -> None:
+        #     """Change the alpha of the SWAT layers."""
+        #     for module in net.modules():
+        #         if hasattr(module, "alpha"):
+        #             module.alpha = alpha
 
         # if config.run_config["curr_round"] != 1:
         #     self.net.apply(lambda x: _changing_sparsity(x, 0.0))
@@ -212,7 +214,7 @@ class Client(fl.client.NumPyClient):
             self.working_dir,
         )
 
-        trained_parameters = generic_get_parameters(self.net)
+        # trained_parameters = generic_get_parameters(self.net)
 
         # Check if the mask has been used
         # if config.extra["mask"]:
@@ -228,7 +230,8 @@ class Client(fl.client.NumPyClient):
         # print(f"[CLIENT!!!] the metrics are: {metrics}")
 
         return (
-            trained_parameters,
+            # trained_parameters,
+            generic_get_parameters(self.net),
             num_samples,
             metrics,
         )
@@ -288,15 +291,15 @@ class Client(fl.client.NumPyClient):
         # print(f"[client_{self.cid}] evaluation time: {end_time - start_time}")
 
         # Check, from the config, if the mask has to be used
-        if config.extra["mask"]:
-            mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-            if mask_path.exists():
-                with open(mask_path, "rb") as f:
-                    mask = pickle.load(f)
-                # Apply the to the parameters
-                parameters = [
-                    param * m for param, m in zip(parameters, mask, strict=True)
-                ]
+        # if config.extra["mask"]:
+        #     mask_path = self.working_dir / f"mask_{self.cid}.pickle"
+        #     if mask_path.exists():
+        #         with open(mask_path, "rb") as f:
+        #             mask = pickle.load(f)
+        #         # Apply the to the parameters
+        #         parameters = [
+        #             param * m for param, m in zip(parameters, mask, strict=True)
+        #         ]
 
         self.net = self.set_parameters(
             parameters,
