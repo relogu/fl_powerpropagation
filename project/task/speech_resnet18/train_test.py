@@ -137,7 +137,7 @@ def train(  # pylint: disable=too-many-arguments
 
                 # Clear gradients to save memory
                 # optimizer.zero_grad()  # ? not sure if this is needed
-    torch.cuda.empty_cache()
+    # torch.cuda.empty_cache()
 
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
