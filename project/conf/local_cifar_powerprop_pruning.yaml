@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: local_cifar_powerprop_pruning
   - fed: local_cifar
-  - strategy: fedavg
+  - strategy: fedavgNZ
   - dataset: local_cifar_lda
 
 # If running the same experiment multiple times
@@ -23,14 +23,14 @@ to_save_once: [history, yaml, log]
 to_save_per_round: [parameters]
 
 # The frequency with which they should be saved
-save_frequency: 10
+save_frequency: 1
 
 # List of flie patterns to be deleted
 # prior to and at the end of training from working_dir
 to_clean_once: [history, parameters, yaml, log]
 
 # Control wandb logging
-use_wandb: true
+use_wandb: false
 
 # Test without Ray to to enable easy error detection
 test_clients:

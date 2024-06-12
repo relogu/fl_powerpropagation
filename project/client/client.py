@@ -6,6 +6,7 @@ Make sure the model and dataset are not loaded before the fit function.
 import logging
 import math
 from pathlib import Path
+import pickle
 
 
 import flwr as fl
@@ -159,6 +160,18 @@ class Client(fl.client.NumPyClient):
         #             for param, m, n in zip(parameters, mask, noise, strict=True)
         #         ]
 
+        # trained_parameters = generic_get_parameters(self.net)
+        if config.extra["mask"]:
+            # Estract the mask from the parameters
+            # mask = [param != 0 for param in trained_parameters]
+            mask = [param != 0 for param in parameters]
+            # Save the mask in the output dir
+            mask_path = (
+                self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
+            )
+            with open(mask_path, "wb") as fw:
+                pickle.dump(mask, fw)
+
         self.net = self.set_parameters(
             parameters,
             config.net_config,
@@ -214,9 +227,8 @@ class Client(fl.client.NumPyClient):
             self.working_dir,
         )
 
-        # trained_parameters = generic_get_parameters(self.net)
-
         # Check if the mask has been used
+        # trained_parameters = generic_get_parameters(self.net)
         # if config.extra["mask"]:
         #     # Estract the mask from the parameters
         #     mask = [param != 0 for param in trained_parameters]
@@ -263,6 +275,7 @@ class Client(fl.client.NumPyClient):
         del _config
 
         config.run_config["device"] = obtain_device()
+        config.run_config["curr_round"] = config.extra["curr_round"]
 
         self.net = self.set_parameters(
             parameters,
@@ -300,6 +313,18 @@ class Client(fl.client.NumPyClient):
         #         parameters = [
         #             param * m for param, m in zip(parameters, mask, strict=True)
         #         ]
+
+        # trained_parameters = generic_get_parameters(self.net)
+        if config.extra["mask"]:
+            # Estract the mask from the parameters
+            # mask = [param != 0 for param in trained_parameters]
+            mask = [param != 0 for param in parameters]
+            # Save the mask in the output dir
+            mask_path = (
+                self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
+            )
+            with open(mask_path, "wb") as fw:
+                pickle.dump(mask, fw)
 
         self.net = self.set_parameters(
             parameters,

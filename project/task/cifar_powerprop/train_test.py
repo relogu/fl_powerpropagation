@@ -12,7 +12,6 @@ from project.task.cifar_powerprop.models import (
     get_parameters_to_prune,
 )
 
-from torch.cuda.amp import autocast, GradScaler
 
 import torch
 from pydantic import BaseModel
@@ -121,86 +120,86 @@ def train(  # pylint: disable=too-many-arguments
     }
 
 
-def mixed_precision_train(
-    net: nn.Module,
-    trainloader: DataLoader,
-    _config: dict,
-    _working_dir: Path,
-) -> tuple[int, dict]:
-    """Train the network on the training set.
+# def mixed_precision_train(
+#     net: nn.Module,
+#     trainloader: DataLoader,
+#     _config: dict,
+#     _working_dir: Path,
+# ) -> tuple[int, dict]:
+#     """Train the network on the training set.
 
-    Parameters
-    ----------
-    net : nn.Module
-        The neural network to train.
-    trainloader : DataLoader
-        The DataLoader containing the data to train the network on.
-    _config : dict
-        The configuration for the training.
-        Contains the device, number of epochs and learning rate.
+#     Parameters
+#     ----------
+#     net : nn.Module
+#         The neural network to train.
+#     trainloader : DataLoader
+#         The DataLoader containing the data to train the network on.
+#     _config : dict
+#         The configuration for the training.
+#         Contains the device, number of epochs and learning rate.
 
-    Returns
-    -------
-    Tuple[int, dict]
-        The number of samples used for training,
-        the loss, and the accuracy of the input model on the given data.
-    """
-    if len(trainloader.dataset) == 0:
-        raise ValueError("Trainloader cannot be empty.")
+#     Returns
+#     -------
+#     Tuple[int, dict]
+#         The number of samples used for training,
+#         the loss, and the accuracy of the input model on the given data.
+#     """
+#     if len(trainloader.dataset) == 0:
+#         raise ValueError("Trainloader cannot be empty.")
 
-    config: TrainConfig = TrainConfig(**_config)
-    del _config
+#     config: TrainConfig = TrainConfig(**_config)
+#     del _config
 
-    net.to(config.device)
-    net.train()
+#     net.to(config.device)
+#     net.train()
 
-    criterion = nn.CrossEntropyLoss()
+#     criterion = nn.CrossEntropyLoss()
 
-    optimizer = torch.optim.SGD(
-        net.parameters(),
-        lr=config.learning_rate,
-        weight_decay=0.001,
-    )
+#     optimizer = torch.optim.SGD(
+#         net.parameters(),
+#         lr=config.learning_rate,
+#         weight_decay=0.001,
+#     )
 
-    scaler = GradScaler()
+#     scaler = GradScaler()
 
-    final_epoch_per_sample_loss = 0.0
-    num_correct = 0
+#     final_epoch_per_sample_loss = 0.0
+#     num_correct = 0
 
-    for _ in range(config.epochs):
-        final_epoch_per_sample_loss = 0.0
-        num_correct = 0
+#     for _ in range(config.epochs):
+#         final_epoch_per_sample_loss = 0.0
+#         num_correct = 0
 
-        for data, target in trainloader:
-            data, target = data.to(config.device), target.to(config.device)
+#         for data, target in trainloader:
+#             data, target = data.to(config.device), target.to(config.device)
 
-            optimizer.zero_grad()
+#             optimizer.zero_grad()
 
-            with autocast():
-                output = net(data)
-                loss = criterion(output, target)
+#             with autocast():
+#                 output = net(data)
+#                 loss = criterion(output, target)
 
-            final_epoch_per_sample_loss += loss.item()
+#             final_epoch_per_sample_loss += loss.item()
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+#             scaler.scale(loss).backward()
+#             scaler.step(optimizer)
+#             scaler.update()
 
-            num_correct += (output.argmax(1) == target).sum().item()
+#             num_correct += (output.argmax(1) == target).sum().item()
 
-        # Calculate epoch-wise metrics
-        train_loss = final_epoch_per_sample_loss / len(trainloader.dataset)
-        train_accuracy = num_correct / len(trainloader.dataset)
+#         # Calculate epoch-wise metrics
+#         train_loss = final_epoch_per_sample_loss / len(trainloader.dataset)
+#         train_accuracy = num_correct / len(trainloader.dataset)
 
-        # print(
-        #     f"Epoch {epoch + 1}: Train Loss {train_loss:.4f}, Train Accuracy"
-        #     f" {train_accuracy:.4f}"
-        # )
+#         # print(
+#         #     f"Epoch {epoch + 1}: Train Loss {train_loss:.4f}, Train Accuracy"
+#         #     f" {train_accuracy:.4f}"
+#         # )
 
-    return len(trainloader.dataset), {
-        "train_loss": train_loss,
-        "train_accuracy": train_accuracy,
-    }
+#     return len(trainloader.dataset), {
+#         "train_loss": train_loss,
+#         "train_accuracy": train_accuracy,
+#     }
 
 
 def get_train_and_prune(
@@ -264,8 +263,8 @@ def get_train_and_prune(
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
 
-            del parameters_to_prune
-            # torch.cuda.empty_cache()
+            # del parameters_to_prune
+            torch.cuda.empty_cache()
 
         # get the amount of parameters to prune from the first module that has sparsity
 
@@ -346,6 +345,8 @@ def test(
             correct += (predicted == labels).sum().item()
     elapsed_time = time.time() - start_time
     # print(f"Elapsed time for testing: {elapsed_time}")
+
+    torch.cuda.empty_cache()
 
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
