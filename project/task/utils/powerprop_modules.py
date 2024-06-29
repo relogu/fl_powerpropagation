@@ -14,6 +14,40 @@ import torch.nn.functional as F
 from torch.types import _int, _size
 
 
+def spectral_norm(
+    self_weight: torch.Tensor, num_iterations: int = 1, epsilon: float = 1e-12
+) -> torch.Tensor:
+    """Spectral Normalization with sign handling and stability check."""
+    weight = self_weight  # .detach()
+    sign_weight = torch.sign(weight)
+    weight_abs = weight.abs()
+
+    weight_mat = weight_abs.view(weight_abs.size(0), -1)
+    u = torch.randn(weight_mat.size(0), 1, device=weight.device)
+    v = torch.randn(weight_mat.size(1), 1, device=weight.device)
+
+    for _ in range(num_iterations):
+        v = F.normalize(torch.matmul(weight_mat.t(), u), dim=0)
+        u = F.normalize(torch.matmul(weight_mat, v), dim=0)
+
+    sigma = torch.matmul(u.t(), torch.matmul(weight_mat, v))
+    sigma = torch.clamp(sigma, min=epsilon)  # Ensure sigma is not too small
+
+    weight_normalized = (
+        weight_abs / sigma
+    )  # Normalize the weight by the largest singular value
+    # weight_updated = weight * weight_normalized.view_as(self_weight)
+    # weight_updated = sign_weight * weight_normalized.view_as(self_weight)
+
+    # weight_updated = sign_weight * torch.pow(self_weight, 2 + weight_normalized.view_as(self_weight))
+    exponent = 1 + weight_normalized.view_as(self_weight)
+    exponent = torch.clamp(exponent, max=10)  # Clamp to prevent overflow
+
+    weight_updated = sign_weight * torch.pow(weight_abs, exponent)
+
+    return weight_updated
+
+
 class PowerPropLinear(nn.Module):
     """Powerpropagation Linear module."""
 
@@ -45,6 +79,8 @@ class PowerPropLinear(nn.Module):
         weight = self.weight.detach()
         if self.alpha == 1.0:
             return weight
+        if self.alpha < 0:
+            return spectral_norm(weight)
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
         # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
@@ -53,6 +89,8 @@ class PowerPropLinear(nn.Module):
         # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
+        if self.alpha < 0:
+            weight = spectral_norm(self.weight)
         else:
             weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
@@ -109,6 +147,8 @@ class PowerPropConv2D(nn.Module):
         weights = self.weight.detach()
         if self.alpha == 1.0:
             return weights
+        if self.alpha < 0:
+            return spectral_norm(weights)
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
         # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
@@ -117,6 +157,8 @@ class PowerPropConv2D(nn.Module):
         # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
+        if self.alpha < 0:
+            weight = spectral_norm(self.weight)
         else:
             weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha

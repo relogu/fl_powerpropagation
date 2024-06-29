@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from torch import nn
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
 from project.task.default.train_test import (
@@ -26,6 +27,8 @@ from project.task.default.train_test import (
 from project.task.default.train_test import (
     get_on_fit_config_fn as get_default_on_fit_config_fn,
 )
+
+from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
 
 
 class TrainConfig(BaseModel):
@@ -46,6 +49,59 @@ class TrainConfig(BaseModel):
         """Setting to allow any types, including library ones like torch.device."""
 
         arbitrary_types_allowed = True
+
+
+def spectral_norm(
+    weight: torch.Tensor, num_iterations: int = 1, epsilon: float = 1e-12
+) -> torch.Tensor:
+    """Spectral Normalization with sign handling and stability check."""
+    sign_weight = torch.sign(weight)
+    weight_abs = weight.abs()
+
+    weight_mat = weight_abs.view(weight_abs.size(0), -1)
+    u = torch.randn(weight_mat.size(0), 1, device=weight.device)
+    v = torch.randn(weight_mat.size(1), 1, device=weight.device)
+
+    for _ in range(num_iterations):
+        v = F.normalize(torch.matmul(weight_mat.t(), u), dim=0)
+        u = F.normalize(torch.matmul(weight_mat, v), dim=0)
+
+    sigma = torch.matmul(u.t(), torch.matmul(weight_mat, v))
+    sigma = torch.clamp(sigma, min=epsilon)  # Ensure sigma is not too small
+
+    weight_normalized = (
+        weight_abs / sigma
+    )  # Normalize the weight by the largest singular value
+    exponent = 1 + weight_normalized.view_as(weight)
+    exponent = torch.clamp(exponent, max=10)  # Clamp to prevent overflow
+
+    weight_updated = sign_weight * torch.pow(weight_abs, exponent)
+
+    return weight_updated, exponent
+
+
+def compute_average_exponent(model: nn.Module) -> float:
+    """Compute the average exponent across all layers in the model."""
+    total_exponent_sum = 0.0
+    total_non_zero_weights = 0
+
+    for layer in model.modules():
+        if isinstance(
+            layer,
+            PowerPropLinear | PowerPropConv2D,
+        ):
+            weight = layer.weight.data
+            weight = weight[weight != 0]  # Filter out zero weights
+            if weight.numel() > 0:
+                _, exponent = spectral_norm(weight)
+                average_exponent = torch.mean(exponent)
+                total_exponent_sum += average_exponent.item()  # * weight.numel()
+                total_non_zero_weights += 1  # weight.numel()
+
+    if total_non_zero_weights > 0:
+        return total_exponent_sum / total_non_zero_weights
+    else:
+        return 0.0
 
 
 def train(  # pylint: disable=too-many-arguments
@@ -225,6 +281,8 @@ def get_train_and_prune(
         """Training and pruning process."""
         log(logging.DEBUG, "Start training")
 
+        average_exp = compute_average_exponent(net)
+
         # train the network, with the current parameter
         metrics = train(
             # metrics = mixed_precision_train(
@@ -267,7 +325,7 @@ def get_train_and_prune(
             torch.cuda.empty_cache()
 
         # get the amount of parameters to prune from the first module that has sparsity
-
+        metrics[1]["exponet"] = average_exp
         return metrics
 
     return train_and_prune
