@@ -108,6 +108,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+plotting/plots/data
 
 # IPython
 profile_default/

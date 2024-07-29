@@ -8,7 +8,7 @@ model_and_data: RESNET_POWERPROP
 train_structure: CIFAR_POWERPROP_PRUNE
 # train_structure: CIFAR_TRAIN_AND_PRUNE
 
-alpha: 1.0
+alpha: 1.25
 sparsity: 0.9
 
 # Client fit config
