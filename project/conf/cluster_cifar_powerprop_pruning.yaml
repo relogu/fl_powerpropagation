@@ -23,7 +23,7 @@ to_save_once: [history, yaml, log]
 to_save_per_round: [parameters]
 
 # The frequency with which they should be saved
-save_frequency: 1
+save_frequency: 10
 
 # List of flie patterns to be deleted
 # prior to and at the end of training from working_dir
@@ -35,7 +35,7 @@ use_wandb: true
 # Test without Ray to to enable easy error detection
 test_clients:
   all: false
-  one: false
+  one: true
 
 # Wandb configuration
 # add whatever tags you like
@@ -44,7 +44,8 @@ wandb:
   setup:
     # project: final_tests
     # project: mlsys_tests_CIFAR100
-    project: mlsys_tests_CIFAR10
+    # project: mlsys_tests_CIFAR10
+    project: reparametrization_CIFAR10
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
@@ -53,9 +54,9 @@ wandb:
       - patitioning_${dataset.name}
     entity: null
     # id: k4rytjzf
-    resume: auto
+    # resume: auto
     mode: online
-    name: powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
+    name: spectr-powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
 
 # For Ray cluster usage
 # leave null unless you need 

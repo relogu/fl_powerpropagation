@@ -56,6 +56,13 @@ net_config_initial_parameters: {}
 fit_metrics:
   - train_loss
   - train_accuracy
+  - after_training_activation
+  - after_training_deactivation
+  - after_training_sparsity
+  - after_pruning_activation
+  - after_pruning_deactivation
+  - after_pruning_sparsity
+  - learning_rate
   # - update_rate
 
 evaluate_metrics:

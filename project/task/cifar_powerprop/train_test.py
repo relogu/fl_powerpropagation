@@ -1,6 +1,7 @@
 """MNIST training and testing functions, local and federated."""
 
 from collections.abc import Callable, Sized
+from copy import deepcopy
 from pathlib import Path
 import time
 from typing import cast
@@ -8,6 +9,12 @@ from typing import cast
 import logging
 from logging import ERROR
 from flwr.common import log
+from project.fed.utils.utils import (
+    generic_get_parameters,
+    generic_set_parameters,
+    net_compare,
+    print_nonzeros,
+)
 from project.task.cifar_powerprop.models import (
     get_parameters_to_prune,
 )
@@ -18,6 +25,7 @@ from pydantic import BaseModel
 from torch import nn
 from torch.nn.utils import prune
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 from project.task.default.train_test import get_fed_eval_fn as get_default_fed_eval_fn
 from project.task.default.train_test import (
@@ -26,6 +34,8 @@ from project.task.default.train_test import (
 from project.task.default.train_test import (
     get_on_fit_config_fn as get_default_on_fit_config_fn,
 )
+
+from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
 
 
 class TrainConfig(BaseModel):
@@ -46,6 +56,59 @@ class TrainConfig(BaseModel):
         """Setting to allow any types, including library ones like torch.device."""
 
         arbitrary_types_allowed = True
+
+
+def spectral_norm(
+    weight: torch.Tensor, num_iterations: int = 1, epsilon: float = 1e-12
+) -> torch.Tensor:
+    """Spectral Normalization with sign handling and stability check."""
+    sign_weight = torch.sign(weight)
+    weight_abs = weight.abs()
+
+    weight_mat = weight_abs.view(weight_abs.size(0), -1)
+    u = torch.randn(weight_mat.size(0), 1, device=weight.device)
+    v = torch.randn(weight_mat.size(1), 1, device=weight.device)
+
+    for _ in range(num_iterations):
+        v = F.normalize(torch.matmul(weight_mat.t(), u), dim=0)
+        u = F.normalize(torch.matmul(weight_mat, v), dim=0)
+
+    sigma = torch.matmul(u.t(), torch.matmul(weight_mat, v))
+    sigma = torch.clamp(sigma, min=epsilon)  # Ensure sigma is not too small
+
+    weight_normalized = (
+        weight_abs / sigma
+    )  # Normalize the weight by the largest singular value
+    exponent = 1 + weight_normalized.view_as(weight)
+    exponent = torch.clamp(exponent, max=10)  # Clamp to prevent overflow
+
+    weight_updated = sign_weight * torch.pow(weight_abs, exponent)
+
+    return weight_updated, exponent
+
+
+def compute_average_exponent(model: nn.Module) -> float:
+    """Compute the average exponent across all layers in the model."""
+    total_exponent_sum = 0.0
+    total_non_zero_weights = 0
+
+    for layer in model.modules():
+        if isinstance(
+            layer,
+            PowerPropLinear | PowerPropConv2D,
+        ):
+            weight = layer.weight.data
+            weight = weight[weight != 0]  # Filter out zero weights
+            if weight.numel() > 0:
+                _, exponent = spectral_norm(weight)
+                average_exponent = torch.mean(exponent)
+                total_exponent_sum += average_exponent.item()  # * weight.numel()
+                total_non_zero_weights += 1  # weight.numel()
+
+    if total_non_zero_weights > 0:
+        return total_exponent_sum / total_non_zero_weights
+    else:
+        return 0.0
 
 
 def train(  # pylint: disable=too-many-arguments
@@ -225,6 +288,9 @@ def get_train_and_prune(
         """Training and pruning process."""
         log(logging.DEBUG, "Start training")
 
+        average_exp = compute_average_exponent(net)
+        before_train_net = deepcopy(net)
+
         # train the network, with the current parameter
         metrics = train(
             # metrics = mixed_precision_train(
@@ -233,6 +299,10 @@ def get_train_and_prune(
             _config=_config,
             _working_dir=_working_dir,
         )
+        after_train_net = deepcopy(net)
+        after_training_sparsity = print_nonzeros(net, "[train] After training:")
+        after_training_metrics = net_compare(before_train_net, after_train_net)
+
         base_alpha = 1.0
         num_pruning_round = 1000
         # num_scales = 5
@@ -266,8 +336,31 @@ def get_train_and_prune(
             # del parameters_to_prune
             torch.cuda.empty_cache()
 
+        # Gathering information about weights regrowth during training
+        after_pruning_sparsity = print_nonzeros(net, "[train] After pruning:")
+        after_prune_net = deepcopy(before_train_net)
+        generic_set_parameters(after_prune_net, generic_get_parameters(net))
+        after_pruning_metrics = net_compare(before_train_net, after_prune_net)
+        # print("!!![NET_COMPARE] After pruning:", after_pruning_metrics)
         # get the amount of parameters to prune from the first module that has sparsity
 
+        if _config["curr_round"] > 1:
+            metrics[1]["after_training_activation"] = after_training_metrics[
+                "activated"
+            ]
+            metrics[1]["after_training_deactivation"] = after_training_metrics[
+                "deactivated"
+            ]
+            metrics[1]["after_training_sparsity"] = after_training_sparsity
+            metrics[1]["after_pruning_activation"] = after_pruning_metrics["activated"]
+            metrics[1]["after_pruning_deactivation"] = after_pruning_metrics[
+                "deactivated"
+            ]
+            metrics[1]["after_pruning_sparsity"] = after_pruning_sparsity
+        # print(f"The metrics are {metrics[1]}")
+
+        # get the amount of parameters to prune from the first module that has sparsity
+        metrics[1]["exponet"] = average_exp
         return metrics
 
     return train_and_prune
