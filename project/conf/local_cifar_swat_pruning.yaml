@@ -3,7 +3,7 @@ defaults:
   - _self_
   - task: local_cifar_swat_pruning
   - fed: local_cifar
-  - strategy: fedavg
+  - strategy: fedavgNZ
   - dataset: local_cifar_lda
 
 # If running the same experiment multiple times
@@ -42,7 +42,7 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: local_tests
+    project: local_tests_CIFAR_regrowth
     tags: ['strategy_${strategy.name}', 'seed_${fed.seed}']
     entity: null
     mode: online

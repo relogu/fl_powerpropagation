@@ -197,6 +197,8 @@ def test(
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
 
+    torch.cuda.empty_cache()
+
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
         len(cast(Sized, testloader.dataset)),
@@ -296,6 +298,7 @@ def get_train_and_prune(
             prune.remove(module, name)
 
         del parameters_to_prune
+        torch.cuda.empty_cache()
 
         after_pruning_sparsity = print_nonzeros(net, "[train] After pruning:")
         after_prune_net = deepcopy(before_train_net)

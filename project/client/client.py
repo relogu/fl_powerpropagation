@@ -7,7 +7,6 @@ import logging
 import math
 from pathlib import Path
 import pickle
-import numpy as np
 
 
 import flwr as fl
@@ -162,16 +161,16 @@ class Client(fl.client.NumPyClient):
         #         ]
 
         # trained_parameters = generic_get_parameters(self.net)
-        if config.extra["mask"]:
-            # Estract the mask from the parameters
-            # mask = [param != 0 for param in trained_parameters]
-            mask = [param != 0 for param in parameters]
-            # Save the mask in the output dir
-            mask_path = (
-                self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
-            )
-            with open(mask_path, "wb") as fw:
-                pickle.dump(mask, fw)
+        # if config.extra["mask"]:
+        #     # Estract the mask from the parameters
+        #     # mask = [param != 0 for param in trained_parameters]
+        #     mask = [param != 0 for param in parameters]
+        #     # Save the mask in the output dir
+        #     mask_path = (
+        #         self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
+        #     )
+        #     with open(mask_path, "wb") as fw:
+        #         pickle.dump(mask, fw)
 
         self.net = self.set_parameters(
             parameters,
@@ -240,11 +239,31 @@ class Client(fl.client.NumPyClient):
 
         metrics["learning_rate"] = config.run_config["learning_rate"]
 
+        # Saving binary mask for masks overlap
+        updated_parameters = generic_get_parameters(self.net)
+        # saving the mask of the local-update
+        if config.extra["mask"]:
+            # Estract the mask from the parameters
+            # mask = [param != 0 for param in trained_parameters]
+            mask = [param != 0 for param in updated_parameters]
+            # Save the mask in the output dir
+            file_name = (
+                f"mask_{config.run_config['curr_round']}"
+                f"_client_{config.run_config['cid']}.pickle"
+            )
+            mask_path = self.working_dir / "client_masks" / file_name
+            if not mask_path.exists():
+                mask_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(mask_path, "wb") as fw:
+                # save the binary mask
+                pickle.dump(mask, fw)
+
         # print(f"[CLIENT!!!] the metrics are: {metrics}")
 
         return (
             # trained_parameters,
-            generic_get_parameters(self.net),
+            # generic_get_parameters(self.net),
+            updated_parameters,
             num_samples,
             metrics,
         )
@@ -316,29 +335,19 @@ class Client(fl.client.NumPyClient):
         #         ]
 
         # trained_parameters = generic_get_parameters(self.net)
+
+        # Saving the mask of the global model
         if config.extra["mask"]:
             # Estract the mask from the parameters
             # mask = [param != 0 for param in trained_parameters]
-            # mask = [param != 0 for param in parameters]
-            # Assuming `parameters` is a list of numpy arrays
-            flattened_parameters = np.concatenate([
-                param.flatten() for param in parameters
-            ])
-
-            # Convert to binary mask
-            mask = (flattened_parameters != 0).astype(np.uint8)
-            # Convert the binary mask to a bitmask
-            bitmask = np.packbits(mask)
-
+            mask = [param != 0 for param in parameters]
             # Save the mask in the output dir
             mask_path = (
                 self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
             )
             with open(mask_path, "wb") as fw:
                 # save the binary mask
-                # pickle.dump(mask, fw)
-                # save the sparse mask
-                pickle.dump((bitmask, mask.size), fw)
+                pickle.dump(mask, fw)
 
         self.net = self.set_parameters(
             parameters,
