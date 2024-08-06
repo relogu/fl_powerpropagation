@@ -22,20 +22,16 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_powerprop.models import get_network_generator_resnet_powerprop
+from project.task.cifar_flash.models import get_network_generator_resnet_powerprop
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
-from project.task.cifar_powerprop.dataset import (
+from project.task.cifar_flash.dataset import (
     get_dataloader_generators as new_generators,
 )
-from project.task.cifar_powerprop.dataset_old import (
-    get_dataloader_generators as old_generators,
-)
-from project.task.cifar_powerprop.train_test import (
+from project.task.cifar_flash.train_test import (
     get_fed_eval_fn,
     get_train_and_prune,
     test,
-    train,
 )
 from project.types.common import DataStructure, TrainStructure
 
@@ -71,12 +67,7 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "CIFAR_POWERPROP":
-        return train, test, get_fed_eval_fn
-    elif (
-        train_structure is not None
-        and train_structure.upper() == "CIFAR_POWERPROP_PRUNE"
-    ):
+    if train_structure is not None and train_structure.upper() == "CIFAR_FLASH_PRUNE":
         sparsity = cfg.get("task", {}).get("sparsity", 0.0)
         alpha = cfg.get("task", {}).get("alpha", 1.0)
         return (
@@ -130,39 +121,25 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
     if client_model_and_data is not None and partition_dir is not None:
         # Obtain the dataloader generators
         # for the provided partition dir
+        alpha = cfg.get("task", {}).get("alpha", 1.0)
+        sparsity = cfg.get("task", {}).get("sparsity", 0.0)
+        num_classes: int = cfg.get("dataset", {}).get(
+            "num_classes",
+            10,
+        )
 
         # Case insensitive matches
-        if client_model_and_data.upper() == "RESNET_POWERPROP":
+        if client_model_and_data.upper() == "RESNET_FLASH":
             (
                 client_dataloader_gen,
                 fed_dataloater_gen,
             ) = new_generators(
                 Path(partition_dir),
             )
-            alpha = cfg.get("task", {}).get("alpha", 1.0)
-            sparsity = cfg.get("task", {}).get("sparsity", 0.0)
-            num_classes: int = cfg.get("dataset", {}).get(
-                "num_classes",
-                10,
-            )
             return (
                 get_network_generator_resnet_powerprop(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
                 ),
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            )
-
-        elif client_model_and_data.upper() == "POWERPROP_OLD":
-            (
-                client_dataloader_gen,
-                fed_dataloater_gen,
-            ) = old_generators(
-                Path(partition_dir),
-            )
-            alpha = cfg.get("task", {}).get("alpha", 4.0)
-            return (
-                get_network_generator_resnet_powerprop(alpha=alpha),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

@@ -81,6 +81,18 @@ from project.task.cifar_zerofl.dispatch import (
     dispatch_train as dispatch_cifar_zeroFL_train,
 )
 
+# Cifar FLASH
+from project.task.cifar_flash.dispatch import (
+    dispatch_config as dispatch_cifar_flash_config,
+)
+from project.task.cifar_flash.dispatch import (
+    dispatch_data as dispatch_cifar_flash_data,
+)
+from project.task.cifar_flash.dispatch import (
+    dispatch_train as dispatch_cifar_flash_train,
+)
+
+
 # Speech command dispatch
 from project.task.speech_resnet18.dispatch import (
     dispatch_config as dispatch_speech_resnet18_config,
@@ -125,6 +137,7 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
         dispatch_resnet18_train,
         dispatch_cifar_zeroFL_train,
         dispatch_speech_resnet18_train,
+        dispatch_cifar_flash_train,
     ]
 
     # Match the first function which does not return None
@@ -169,6 +182,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure:
         dispatch_resnet18_data,
         dispatch_cifar_zeroFL_data,
         dispatch_speech_resnet18_data,
+        dispatch_cifar_flash_data,
     ]
 
     # Match the first function which does not return None
@@ -213,6 +227,7 @@ def dispatch_config(cfg: DictConfig) -> ConfigStructure:
         dispatch_resnet18_config,
         dispatch_cifar_zeroFL_config,
         dispatch_speech_resnet18_config,
+        dispatch_cifar_flash_config,
     ]
 
     # Match the first function which does not return None

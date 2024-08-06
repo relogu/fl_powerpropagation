@@ -15,7 +15,7 @@ from project.fed.utils.utils import (
     net_compare,
     print_nonzeros,
 )
-from project.task.cifar_powerprop.models import (
+from project.task.cifar_flash.models import (
     get_parameters_to_prune,
 )
 
@@ -144,6 +144,11 @@ def train(  # pylint: disable=too-many-arguments
     config: TrainConfig = TrainConfig(**_config)
     del _config
 
+    # FLASH
+    mask = []
+    for param in net.parameters():
+        mask.append((param != 0).float())
+
     net.to(config.device)
     net.train()
 
@@ -173,6 +178,13 @@ def train(  # pylint: disable=too-many-arguments
             final_epoch_per_sample_loss += loss.item()
             num_correct += (output.max(1)[1] == target).clone().detach().sum().item()
             loss.backward()
+
+            # FLASH
+            # apply the mask to the gradients
+            with torch.no_grad():
+                for param, m in zip(net.parameters(), mask, strict=True):
+                    param.grad *= m.to(config.device)
+
             optimizer.step()
 
     return len(cast(Sized, trainloader.dataset)), {
@@ -181,88 +193,6 @@ def train(  # pylint: disable=too-many-arguments
         ),
         "train_accuracy": float(num_correct) / len(cast(Sized, trainloader.dataset)),
     }
-
-
-# def mixed_precision_train(
-#     net: nn.Module,
-#     trainloader: DataLoader,
-#     _config: dict,
-#     _working_dir: Path,
-# ) -> tuple[int, dict]:
-#     """Train the network on the training set.
-
-#     Parameters
-#     ----------
-#     net : nn.Module
-#         The neural network to train.
-#     trainloader : DataLoader
-#         The DataLoader containing the data to train the network on.
-#     _config : dict
-#         The configuration for the training.
-#         Contains the device, number of epochs and learning rate.
-
-#     Returns
-#     -------
-#     Tuple[int, dict]
-#         The number of samples used for training,
-#         the loss, and the accuracy of the input model on the given data.
-#     """
-#     if len(trainloader.dataset) == 0:
-#         raise ValueError("Trainloader cannot be empty.")
-
-#     config: TrainConfig = TrainConfig(**_config)
-#     del _config
-
-#     net.to(config.device)
-#     net.train()
-
-#     criterion = nn.CrossEntropyLoss()
-
-#     optimizer = torch.optim.SGD(
-#         net.parameters(),
-#         lr=config.learning_rate,
-#         weight_decay=0.001,
-#     )
-
-#     scaler = GradScaler()
-
-#     final_epoch_per_sample_loss = 0.0
-#     num_correct = 0
-
-#     for _ in range(config.epochs):
-#         final_epoch_per_sample_loss = 0.0
-#         num_correct = 0
-
-#         for data, target in trainloader:
-#             data, target = data.to(config.device), target.to(config.device)
-
-#             optimizer.zero_grad()
-
-#             with autocast():
-#                 output = net(data)
-#                 loss = criterion(output, target)
-
-#             final_epoch_per_sample_loss += loss.item()
-
-#             scaler.scale(loss).backward()
-#             scaler.step(optimizer)
-#             scaler.update()
-
-#             num_correct += (output.argmax(1) == target).sum().item()
-
-#         # Calculate epoch-wise metrics
-#         train_loss = final_epoch_per_sample_loss / len(trainloader.dataset)
-#         train_accuracy = num_correct / len(trainloader.dataset)
-
-#         # print(
-#         #     f"Epoch {epoch + 1}: Train Loss {train_loss:.4f}, Train Accuracy"
-#         #     f" {train_accuracy:.4f}"
-#         # )
-
-#     return len(trainloader.dataset), {
-#         "train_loss": train_loss,
-#         "train_accuracy": train_accuracy,
-#     }
 
 
 def get_train_and_prune(
@@ -290,6 +220,11 @@ def get_train_and_prune(
 
         average_exp = compute_average_exponent(net)
         before_train_net = deepcopy(net)
+        # temp_net = deepcopy(net)
+
+        # if _config["curr_round"] == 1:
+        #     log(logging.DEBUG, "First round, warmup training")
+        #     _config["epochs"] = 10
 
         # train the network, with the current parameter
         metrics = train(
@@ -303,23 +238,7 @@ def get_train_and_prune(
         after_training_sparsity = print_nonzeros(net, "[train] After training:")
         after_training_metrics = net_compare(before_train_net, after_train_net)
 
-        base_alpha = 1.0
-        num_pruning_round = 1000
-        # num_scales = 5
-        # sparsity_range = 1 - amount
-        # sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
-        sparsity_inc = 0
-
-        # print(f"[client_{_config['cid']}]sparsity_inc: {sparsity_inc}")
-
-        if (
-            _config["curr_round"] < num_pruning_round or alpha == base_alpha
-        ) and amount > 0:
-            """
-            The net must be pruned:
-            - at the first round if we are using powerprop
-            - every round if we are not using powerprop (alpha=1.0)
-            """
+        if amount != 0:
             parameters_to_prune = get_parameters_to_prune(net)
 
             prune.global_unstructured(
@@ -328,13 +247,28 @@ def get_train_and_prune(
                     for module, tensor_name, _ in parameters_to_prune
                 ],
                 pruning_method=pruning_method,
-                amount=amount + sparsity_inc,
+                amount=amount,
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
             torch.cuda.empty_cache()
 
-            # del parameters_to_prune
+        # if _config["curr_round"] == 100:
+        #     train_config: TrainConfig = TrainConfig(**_config)
+        #     # get the binary mask for the first round
+        #     mask = []
+        #     generic_set_parameters(temp_net, generic_get_parameters(net))
+        #     for param in temp_net.parameters():
+        #         # mask.append((param != 0))
+        #         mask.append((param != 0).float())
+        #     # apply the mask to the original parameter
+        #     with torch.no_grad():
+        #         for param, m in zip(before_train_net.parameters(), mask):
+        #             param *= m.to(train_config.device)
+        #     # restore original (pruned) parameters
+        #     generic_set_parameters(net, generic_get_parameters(before_train_net))
+
+        # del parameters_to_prune
 
         # Gathering information about weights regrowth during training
         after_pruning_sparsity = print_nonzeros(net, "[train] After pruning:")
