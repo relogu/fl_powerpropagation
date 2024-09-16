@@ -31,6 +31,7 @@ from project.task.speech_resnet18.models import (
 )
 from project.task.speech_resnet18.train_test import (
     get_fed_eval_fn,
+    get_flash_train_and_prune,
     test,
     get_train_and_prune,
 )
@@ -68,21 +69,44 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "SPEECH_RESNET18_PS":
-        alpha: float = cfg.get("task", {}).get(
+    if (
+        train_structure is not None
+        and train_structure.upper() == "SPEECH_RESNET18_PRUNE"
+    ):
+        alpha = cfg.get("task", {}).get(
             "alpha",
             1.25,
         )
-        sparsity: float = cfg.get("task", {}).get(
+        sparsity = cfg.get("task", {}).get(
             "sparsity",
             0.95,
         )
-        # the sparsity must be modified to include the mask
+        # ZeroFL: the sparsity must be modified to include the mask
         mask = cfg.get("task", {}).get("mask", 0.0)
         sparsity = sparsity - mask
         return (
             # train,
             get_train_and_prune(alpha=alpha, amount=sparsity, pruning_method="l1"),
+            test,
+            get_fed_eval_fn,
+        )
+    elif (
+        train_structure is not None
+        and train_structure.upper() == "SPEECH_RESNET18_FLASH"
+    ):
+        alpha = cfg.get("task", {}).get(
+            "alpha",
+            1.0,
+        )
+        sparsity = cfg.get("task", {}).get(
+            "sparsity",
+            0.95,
+        )
+        return (
+            # train,
+            get_flash_train_and_prune(
+                alpha=alpha, amount=sparsity, pruning_method="l1"
+            ),
             test,
             get_fed_eval_fn,
         )

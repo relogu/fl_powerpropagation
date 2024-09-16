@@ -45,7 +45,8 @@ wandb:
     # project: final_tests
     # project: mlsys_tests_CIFAR100
     # project: mlsys_tests_CIFAR10
-    project: flash_tests_CIFAR10
+    # project: flash_tests_CIFAR10
+    project: ablation_tests
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
@@ -56,7 +57,7 @@ wandb:
     # id: k4rytjzf
     # resume: auto
     mode: online
-    name: powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
+    name: Spectral-powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
 
 # For Ray cluster usage
 # leave null unless you need 

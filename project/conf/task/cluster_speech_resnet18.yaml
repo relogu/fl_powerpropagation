@@ -8,8 +8,8 @@ model_and_data: SPEECH_RESNET18
 # model_and_data: SPEECH_ZERO
 
 # Choose the train, test and server fed_eval functions
-train_structure: SPEECH_RESNET18_PS
-# train_structure: CIFAR_TRAIN_AND_PRUNE
+train_structure: SPEECH_RESNET18_PRUNE
+# train_structure: SPEECH_RESNET18_FLASH
 
 alpha: 1.25
 sparsity: 0.9
@@ -27,6 +27,7 @@ fit_config:
     epochs: 1
     learning_rate: 0.1
     final_learning_rate: 0.01
+    warmup: 0
     tot_rounds: 500
   # No extra config
   extra: {mask: false}

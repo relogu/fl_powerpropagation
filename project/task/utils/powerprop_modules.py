@@ -79,7 +79,7 @@ class PowerPropLinear(nn.Module):
         weight = self.weight.detach()
         if self.alpha == 1.0:
             return weight
-        if self.alpha < 0:
+        elif self.alpha < 0:
             return spectral_norm(weight)
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
         # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
@@ -89,7 +89,7 @@ class PowerPropLinear(nn.Module):
         # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
-        if self.alpha < 0:
+        elif self.alpha < 0:
             weight = spectral_norm(self.weight)
         else:
             weight = torch.sign(self.weight) * torch.pow(
@@ -147,7 +147,7 @@ class PowerPropConv2D(nn.Module):
         weights = self.weight.detach()
         if self.alpha == 1.0:
             return weights
-        if self.alpha < 0:
+        elif self.alpha < 0:
             return spectral_norm(weights)
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
         # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
@@ -157,7 +157,7 @@ class PowerPropConv2D(nn.Module):
         # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
-        if self.alpha < 0:
+        elif self.alpha < 0:
             weight = spectral_norm(self.weight)
         else:
             weight = torch.sign(self.weight) * torch.pow(
