@@ -227,7 +227,7 @@ class FedAvgContinual(Strategy):
         clients = client_manager.sample(
             num_clients=sample_size,
             min_num_clients=min_num_clients,
-            criterion=CidAboveNCriterion(cid_threshold=cid_threshold),
+            criterion=CidAboveNCriterion(cid_threshold=cid_threshold),  # type: ignore[arg-type]
         )
 
         # Return client/config pairs
