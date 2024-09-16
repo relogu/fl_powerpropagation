@@ -3,7 +3,6 @@
 from collections.abc import Callable, Sized
 from copy import deepcopy
 from pathlib import Path
-import time
 from typing import cast
 
 import logging
@@ -216,15 +215,39 @@ def get_train_and_prune(
         _working_dir: Path,
     ) -> tuple[int, dict]:
         """Training and pruning process."""
-        log(logging.DEBUG, "Start training")
-
+        log(logging.DEBUG, f"[CLient-{_config['cid']}] Start training")
         average_exp = compute_average_exponent(net)
         before_train_net = deepcopy(net)
-        # temp_net = deepcopy(net)
 
-        # if _config["curr_round"] == 1:
-        #     log(logging.DEBUG, "First round, warmup training")
-        #     _config["epochs"] = 10
+        # FLASH
+        if _config["curr_round"] == 1 and _config["warmup"] > 0:
+            # temp_net = deepcopy(net)
+            log(logging.DEBUG, "First round, warmup training")
+            _config["epochs"] = _config["warmup"]
+
+        # HETERO EXP
+        # FLASH
+        # hetero_densitys = [0.1, 0.15, 0.2]
+        # hetero_densitys = [0.1, 0.05, 0.01]
+        # hetero_densitys = [0.1, 0.05, 0.01, 0.005, 0.001]
+        # amount = 1 - hetero_densitys[int(_config["cid"]) % hetero_densitys.__len__()]
+        # print(f"[CLient{_config['cid']}]Amount: {amount}")
+        # # apply density to the model
+        # temp_net = deepcopy(net)
+        # parameters_to_prune = get_parameters_to_prune(temp_net)
+        # prune.global_unstructured(
+        #     parameters=[
+        #        (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+        #     ],
+        #     pruning_method=pruning_method,
+        #     amount=amount,
+        # )
+        # for module, name, _ in parameters_to_prune:
+        #     prune.remove(module, name)
+        # torch.cuda.empty_cache()
+        # # update the model
+        # generic_set_parameters(net, generic_get_parameters(temp_net))
+        # del temp_net
 
         # train the network, with the current parameter
         metrics = train(
@@ -253,17 +276,19 @@ def get_train_and_prune(
                 prune.remove(module, name)
             torch.cuda.empty_cache()
 
-        # if _config["curr_round"] == 100:
+        # WARMUP
+        #  if _config["curr_round"] == 1 and _config["warmup"] > 0:
         #     train_config: TrainConfig = TrainConfig(**_config)
         #     # get the binary mask for the first round
         #     mask = []
+        #     temp_net = deepcopy(before_train_net)
         #     generic_set_parameters(temp_net, generic_get_parameters(net))
         #     for param in temp_net.parameters():
         #         # mask.append((param != 0))
         #         mask.append((param != 0).float())
         #     # apply the mask to the original parameter
         #     with torch.no_grad():
-        #         for param, m in zip(before_train_net.parameters(), mask):
+        #         for param, m in zip(before_train_net.parameters(), mask, strict=True):
         #             param *= m.to(train_config.device)
         #     # restore original (pruned) parameters
         #     generic_set_parameters(net, generic_get_parameters(before_train_net))
@@ -357,7 +382,6 @@ def test(
     criterion = nn.CrossEntropyLoss()
     correct, per_sample_loss = 0, 0.0
 
-    start_time = time.time()
     with torch.no_grad():
         for images, labels in testloader:
             images, labels = (
@@ -373,8 +397,48 @@ def test(
             ).item()
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
-    elapsed_time = time.time() - start_time
-    # print(f"Elapsed time for testing: {elapsed_time}")
+    torch.cuda.empty_cache()
+
+    # # hetero_densitys = [0.1, 0.05, 0.01]
+    # # hetero_densitys = [0.1, 0.001, 0.001]
+    # hetero_densitys = [0.1, 0.05, 0.01, 0.005, 0.001]
+    # sparse_correct = [0] * hetero_densitys.__len__()
+    # for i, density in enumerate(hetero_densitys):
+    #     sparse_model = deepcopy(net)
+    #     amount = 1 - density
+    #     # apply density to the model
+    #     parameters_to_prune = get_parameters_to_prune(sparse_model)
+    #     prune.global_unstructured(
+    #         parameters=[
+    #            (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+    #         ],
+    #         pruning_method=prune.L1Unstructured,
+    #         amount=amount,
+    #     )
+    #     for module, name, _ in parameters_to_prune:
+    #         prune.remove(module, name)
+    #     torch.cuda.empty_cache()
+    #     # update the model
+    #     generic_set_parameters(net, generic_get_parameters(sparse_model))
+
+    #     # sparse evaluation
+    #     sparse_correct[i], sparse_per_sample_loss = 0, 0.0
+    #     with torch.no_grad():
+    #         for images, labels in testloader:
+    #             images, labels = (
+    #                 images.to(
+    #                     config.device,
+    #                 ),
+    #                 labels.to(config.device),
+    #             )
+    #             outputs = net(images)
+    #             sparse_per_sample_loss += criterion(
+    #                 outputs,
+    #                 labels,
+    #             ).item()
+    #             _, predicted = torch.max(outputs.data, 1)
+    #             sparse_correct[i] += (predicted == labels).sum().item()
+    #     torch.cuda.empty_cache()
 
     torch.cuda.empty_cache()
 
@@ -383,7 +447,15 @@ def test(
         len(cast(Sized, testloader.dataset)),
         {
             "test_accuracy": float(correct) / len(cast(Sized, testloader.dataset)),
-            "test_time": elapsed_time,
+            # "hetero_test_acc_0": float(sparse_correct[0]) / len(
+            #     cast(Sized, testloader.dataset)
+            # ),
+            # "hetero_test_acc_1": float(
+            #     sparse_correct[int(hetero_densitys.__len__() / 2)]
+            # ) / len(cast(Sized, testloader.dataset)),
+            # "hetero_test_acc_2": float(sparse_correct[-1]) / len(
+            #     cast(Sized, testloader.dataset)
+            # ),
         },
     )
 

@@ -37,6 +37,43 @@ torch.autograd.set_detect_anomaly(True)
 top_k_threshold = 0.01
 
 
+def spectral_norm(
+    self_weight: torch.Tensor, num_iterations: int = 1, epsilon: float = 1e-12
+) -> torch.Tensor:
+    """Spectral Normalization with sign handling and stability check."""
+    weight = self_weight  # .detach()
+    sign_weight = torch.sign(weight)
+    weight_abs = weight.abs()
+
+    weight_mat = weight_abs.view(weight_abs.size(0), -1)
+    u = torch.randn(weight_mat.size(0), 1, device=weight.device)
+    v = torch.randn(weight_mat.size(1), 1, device=weight.device)
+
+    for _ in range(num_iterations):
+        v = F.normalize(torch.matmul(weight_mat.t(), u), dim=0)
+        u = F.normalize(torch.matmul(weight_mat, v), dim=0)
+
+    sigma = torch.matmul(u.t(), torch.matmul(weight_mat, v))
+    sigma = torch.clamp(sigma, min=epsilon)  # Ensure sigma is not too small
+
+    weight_normalized = (
+        weight_abs / sigma
+    )  # Normalize the weight by the largest singular value
+
+    return self_weight * weight_normalized.view_as(self_weight)
+
+    # weight_updated = weight * weight_normalized.view_as(self_weight)
+    # weight_updated = sign_weight * weight_normalized.view_as(self_weight)
+
+    # weight_updated = sign_weight * torch.pow(self_weight, 2 + weight_normalized.view_as(self_weight))
+    exponent = 1 + weight_normalized.view_as(self_weight)
+    exponent = torch.clamp(exponent, max=10)  # Clamp to prevent overflow
+
+    weight_updated = sign_weight * torch.pow(weight_abs, exponent)
+
+    return weight_updated
+
+
 def convolution_backward(
     ctx,
     grad_output,
@@ -164,6 +201,10 @@ class SWATLinear(nn.Module):
 
     def get_weights(self):
         weights = self.weight.detach()
+        if self.alpha == 1.0:
+            return weights
+        elif self.alpha < 0:
+            return spectral_norm(weights)
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
 
     def _call_swat_linear(self, input, weight) -> torch.Tensor:
@@ -178,6 +219,8 @@ class SWATLinear(nn.Module):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha == 1.0:
             powerprop_weight = self.weight
+        elif self.alpha < 0:
+            powerprop_weight = spectral_norm(self.weight)
         else:
             # powerprop_weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
             powerprop_weight = torch.sign(self.weight) * torch.pow(
@@ -316,6 +359,10 @@ class SWATConv2D(nn.Module):
 
     def get_weight(self):
         weight = self.weight.detach()
+        if self.alpha == 1.0:
+            return weight
+        if self.alpha < 0:
+            return spectral_norm(weight)
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
 
     def _call_swat_conv2d(self, input, weight) -> torch.Tensor:
@@ -348,15 +395,17 @@ class SWATConv2D(nn.Module):
 
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
-        if self.alpha != 1.0:
+        if self.alpha == 1.0:
+            powerprop_weight = self.weight
+        elif self.alpha < 0:
+            powerprop_weight = spectral_norm(self.weight)
+        else:
             powerprop_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )
             # powerprop_weight = self.weight * torch.pow(
             #     self.weight.abs(), self.alpha - 1
             # )
-        else:
-            powerprop_weight = self.weight
 
         # Perform the forward pass
         output = self._call_swat_conv2d(

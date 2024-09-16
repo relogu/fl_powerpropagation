@@ -3,7 +3,6 @@
 from collections.abc import Callable, Sized
 from copy import deepcopy
 from pathlib import Path
-import time
 from typing import cast
 
 import logging
@@ -183,88 +182,6 @@ def train(  # pylint: disable=too-many-arguments
     }
 
 
-# def mixed_precision_train(
-#     net: nn.Module,
-#     trainloader: DataLoader,
-#     _config: dict,
-#     _working_dir: Path,
-# ) -> tuple[int, dict]:
-#     """Train the network on the training set.
-
-#     Parameters
-#     ----------
-#     net : nn.Module
-#         The neural network to train.
-#     trainloader : DataLoader
-#         The DataLoader containing the data to train the network on.
-#     _config : dict
-#         The configuration for the training.
-#         Contains the device, number of epochs and learning rate.
-
-#     Returns
-#     -------
-#     Tuple[int, dict]
-#         The number of samples used for training,
-#         the loss, and the accuracy of the input model on the given data.
-#     """
-#     if len(trainloader.dataset) == 0:
-#         raise ValueError("Trainloader cannot be empty.")
-
-#     config: TrainConfig = TrainConfig(**_config)
-#     del _config
-
-#     net.to(config.device)
-#     net.train()
-
-#     criterion = nn.CrossEntropyLoss()
-
-#     optimizer = torch.optim.SGD(
-#         net.parameters(),
-#         lr=config.learning_rate,
-#         weight_decay=0.001,
-#     )
-
-#     scaler = GradScaler()
-
-#     final_epoch_per_sample_loss = 0.0
-#     num_correct = 0
-
-#     for _ in range(config.epochs):
-#         final_epoch_per_sample_loss = 0.0
-#         num_correct = 0
-
-#         for data, target in trainloader:
-#             data, target = data.to(config.device), target.to(config.device)
-
-#             optimizer.zero_grad()
-
-#             with autocast():
-#                 output = net(data)
-#                 loss = criterion(output, target)
-
-#             final_epoch_per_sample_loss += loss.item()
-
-#             scaler.scale(loss).backward()
-#             scaler.step(optimizer)
-#             scaler.update()
-
-#             num_correct += (output.argmax(1) == target).sum().item()
-
-#         # Calculate epoch-wise metrics
-#         train_loss = final_epoch_per_sample_loss / len(trainloader.dataset)
-#         train_accuracy = num_correct / len(trainloader.dataset)
-
-#         # print(
-#         #     f"Epoch {epoch + 1}: Train Loss {train_loss:.4f}, Train Accuracy"
-#         #     f" {train_accuracy:.4f}"
-#         # )
-
-#     return len(trainloader.dataset), {
-#         "train_loss": train_loss,
-#         "train_accuracy": train_accuracy,
-#     }
-
-
 def get_train_and_prune(
     alpha: float = 1.0, amount: float = 0.0, pruning_method: str = "l1"
 ) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
@@ -290,6 +207,29 @@ def get_train_and_prune(
 
         average_exp = compute_average_exponent(net)
         before_train_net = deepcopy(net)
+
+        # HETERO EXP
+        # # FLASH
+        # # hetero_densitys = [0.1, 0.15, 0.2]
+        # # hetero_densitys = [0.1, 0.05, 0.01]
+        # hetero_densitys = [0.1, 0.05, 0.01, 0.005, 0.001]
+        # amount = 1 - hetero_densitys[int(_config["cid"]) % hetero_densitys.__len__()]
+        # # apply density to the model
+        # temp_net = deepcopy(net)
+        # parameters_to_prune = get_parameters_to_prune(temp_net)
+        # prune.global_unstructured(
+        #     parameters=[
+        #        (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+        #     ],
+        #     pruning_method=pruning_method,
+        #     amount=amount,
+        # )
+        # for module, name, _ in parameters_to_prune:
+        #     prune.remove(module, name)
+        # torch.cuda.empty_cache()
+        # # update the model
+        # generic_set_parameters(net, generic_get_parameters(temp_net))
+        # del temp_net
 
         # train the network, with the current parameter
         metrics = train(
@@ -423,7 +363,6 @@ def test(
     criterion = nn.CrossEntropyLoss()
     correct, per_sample_loss = 0, 0.0
 
-    start_time = time.time()
     with torch.no_grad():
         for images, labels in testloader:
             images, labels = (
@@ -439,8 +378,47 @@ def test(
             ).item()
             _, predicted = torch.max(outputs.data, 1)
             correct += (predicted == labels).sum().item()
-    elapsed_time = time.time() - start_time
-    # print(f"Elapsed time for testing: {elapsed_time}")
+    torch.cuda.empty_cache()
+
+    # hetero_densitys = [0.1, 0.05, 0.01]
+    # hetero_densitys = [0.1, 0.05, 0.01, 0.005, 0.001]
+    # sparse_correct = [0] * hetero_densitys.__len__()
+    # for i, density in enumerate(hetero_densitys):
+    #     sparse_model = deepcopy(net)
+    #     amount = 1 - density
+    #     # apply density to the model
+    #     parameters_to_prune = get_parameters_to_prune(sparse_model)
+    #     prune.global_unstructured(
+    #         parameters=[
+    #            (module, tensor_name) for module, tensor_name, _ in parameters_to_prune
+    #         ],
+    #         pruning_method=prune.L1Unstructured,
+    #         amount=amount,
+    #     )
+    #     for module, name, _ in parameters_to_prune:
+    #         prune.remove(module, name)
+    #     torch.cuda.empty_cache()
+    #     # update the model
+    #     generic_set_parameters(net, generic_get_parameters(sparse_model))
+
+    #     # sparse evaluation
+    #     sparse_correct[i], sparse_per_sample_loss = 0, 0.0
+    #     with torch.no_grad():
+    #         for images, labels in testloader:
+    #             images, labels = (
+    #                 images.to(
+    #                     config.device,
+    #                 ),
+    #                 labels.to(config.device),
+    #             )
+    #             outputs = net(images)
+    #             sparse_per_sample_loss += criterion(
+    #                 outputs,
+    #                 labels,
+    #             ).item()
+    #             _, predicted = torch.max(outputs.data, 1)
+    #             sparse_correct[i] += (predicted == labels).sum().item()
+    #     torch.cuda.empty_cache()
 
     torch.cuda.empty_cache()
 
@@ -449,7 +427,15 @@ def test(
         len(cast(Sized, testloader.dataset)),
         {
             "test_accuracy": float(correct) / len(cast(Sized, testloader.dataset)),
-            "test_time": elapsed_time,
+            # "hetero_test_acc_0": float(sparse_correct[0]) / len(
+            #     cast(Sized, testloader.dataset)
+            # ),
+            # "hetero_test_acc_1": float(
+            #     sparse_correct[int(hetero_densitys.__len__() / 2)]
+            # ) / len(cast(Sized, testloader.dataset)),
+            # "hetero_test_acc_2": float(sparse_correct[-1]) / len(
+            #     cast(Sized, testloader.dataset)
+            # ),
         },
     )
 
