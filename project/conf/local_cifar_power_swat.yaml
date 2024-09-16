@@ -1,7 +1,7 @@
 ---
 defaults:
   - _self_
-  - task: local_cifar_powerprop_pruning
+  - task: local_cifar_power_swat
   - fed: local_cifar
   - strategy: fedavg
   - dataset: local_cifar_lda
@@ -35,7 +35,7 @@ use_wandb: true
 # Test without Ray to to enable easy error detection
 test_clients:
   all: false
-  one: false
+  one: true
 
 # Wandb configuration
 # add whatever tags you like
