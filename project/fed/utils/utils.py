@@ -470,11 +470,23 @@ def print_nonzeros(model: nn.Module, msg: str = "") -> float:
         nonzero += nz_count
         total += total_params
 
-    log(
-        logging.INFO,
-        f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
-        f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
-    )
+    # log(
+    #     logging.INFO,
+    #     f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
+    #     f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
+    # )
+    return round(((total - nonzero) / total) * 100, 3)
+
+
+def get_nonzeros(model: nn.Module) -> float:
+    """Return the rate of non-zero parameter in a model."""
+    nonzero = total = 0
+    for _, p in model.named_parameters():
+        tensor = p.data.cpu().numpy()
+        nz_count = np.count_nonzero(tensor)
+        total_params = np.prod(tensor.shape)
+        nonzero += nz_count
+        total += total_params
     return round(((total - nonzero) / total) * 100, 3)
 
 
@@ -499,12 +511,12 @@ def print_nonzeros_grad(model: nn.Module, msg: str = "") -> float:
         total_params = np.prod(tensor.shape)
         nonzero += nz_count
         total += total_params
-    log(
-        logging.INFO,
-        f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
-        f" Compression rate : {total / nonzero:10.2f}x "
-        f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
-    )
+    # log(
+    #     logging.INFO,
+    #     f"{msg}   alive: {nonzero}, pruned : {total - nonzero}, total: {total},"
+    #     f" Compression rate : {total / nonzero:10.2f}x "
+    #     f" ({100 * (total - nonzero) / total:6.2f}% pruned)",
+    # )
     return round((nonzero / total) * 100, 1)
 
 

@@ -25,7 +25,7 @@ fit_config:
     final_learning_rate: 0.01
     tot_rounds: 500
   # No extra config
-  extra: {mask: false, noise: 0}
+  extra: {window_training: false, in_out_eval: false, mask: false, noise: 0}
 
 # Client eval config
 eval_config:
@@ -35,7 +35,7 @@ eval_config:
     batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {mask: true}
+  extra: {window_training: true, mask: true}
 
 # Configuration for the federated testing function
 # Follows the same conventions as the client config
@@ -46,7 +46,7 @@ fed_test_config:
     batch_size: 256
   # Unlike train, the mnist train function takes no parameters?
   run_config: {}
-  extra: {}
+  extra: {window_training: false}
 
 # Configuration instructions for initial parameter 
 # generation
@@ -57,11 +57,16 @@ fit_metrics:
   - train_loss
   - train_accuracy
   - learning_rate
+  - server_accuracy
+  - in_local_accuracy
+  - out_local_accuracy
   - exponet
   # - update_rate
 
 evaluate_metrics:
   - test_accuracy
+  - window_test_acc
+  - prev_window_test_acc
   # - hetero_test_acc_0
   # - hetero_test_acc_1
   # - hetero_test_acc_2

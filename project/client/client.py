@@ -3,7 +3,6 @@
 Make sure the model and dataset are not loaded before the fit function.
 """
 
-import logging
 import math
 from pathlib import Path
 import pickle
@@ -11,20 +10,22 @@ import pickle
 
 import flwr as fl
 from flwr.common import NDArrays
-from flwr.common.logger import log
 from pydantic import BaseModel
 from torch import nn
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
 from project.fed.utils.utils import (
     generic_get_parameters,
     generic_set_parameters,
-    print_nonzeros,
+    get_nonzeros,
 )
 
 from project.types.common import (
     ClientDataloaderGen,
     ClientGen,
     EvalRes,
+    FedDataloaderGen,
     FitRes,
     NetGen,
     TestFunc,
@@ -82,6 +83,7 @@ class Client(fl.client.NumPyClient):
         dataloader_gen: ClientDataloaderGen,
         train: TrainFunc,
         test: TestFunc,
+        fed_dataloader_gen: FedDataloaderGen,  # for the in-out local tests !?
     ) -> None:
         """Initialize the client.
 
@@ -112,6 +114,100 @@ class Client(fl.client.NumPyClient):
         self.dataloader_gen = dataloader_gen
         self.train = train
         self.test = test
+        self.fed_dataloader_gen = fed_dataloader_gen
+
+    def _evaluate_partition(self, dataloader: DataLoader, partition_name: str) -> dict:
+        """Evaluate the model on a specific partition."""
+        # self.net.eval()
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        # device = obtain_device()
+
+        # with torch.no_grad():
+        #     for data, targets in dataloader:
+        #         data, targets = data.to(device), targets.to(device)
+        #         outputs = self.net(data)
+        #         loss = torch.nn.functional.cross_entropy(outputs, targets)
+        #         total_loss += loss.item() * data.size(0)
+        #         _, predicted = outputs.max(1)
+        #         total += targets.size(0)
+        #         correct += predicted.eq(targets).sum().item()
+
+        #         # if partition_name == "out_local":
+        #         #     log(logging.DEBUG, f"[client_{self.cid}] Out-local batch - "
+        #         #         f"Predictions: {predicted.tolist()}, "
+        #         #         f"Targets: {targets.tolist()}")
+
+        accuracy = correct / total if total > 0 else 0.0
+        avg_loss = total_loss / total if total > 0 else 0.0
+
+        return {
+            f"{partition_name}_loss": avg_loss,
+            f"{partition_name}_accuracy": accuracy,
+            f"{partition_name}_samples": total,
+        }
+
+    def _evaluate_in_out_local(
+        self, trainloader: DataLoader, testloader: DataLoader
+    ) -> tuple[dict, dict]:
+        """Evaluate the model on in-local and out-local partitions."""
+        train_classes = set()
+        test_classes = set()
+        for _, labels in trainloader:
+            train_classes.update(labels.numpy())
+        for _, labels in testloader:
+            test_classes.update(labels.numpy())
+
+        in_local_data, in_local_labels = [], []
+        out_local_data, out_local_labels = [], []
+
+        for data, labels in testloader:
+            for i, label in enumerate(labels):
+                if label.item() in train_classes:
+                    in_local_data.append(data[i])
+                    in_local_labels.append(label)
+                else:
+                    out_local_data.append(data[i])
+                    out_local_labels.append(label)
+
+        in_local_results = {
+            "in_local_loss": 0.0,
+            "in_local_accuracy": 0.0,
+            "in_local_samples": len(in_local_data),
+            "in_local_classes": len(train_classes.intersection(test_classes)),
+        }
+
+        out_local_results = {
+            "out_local_loss": None,
+            "out_local_accuracy": None,
+            "out_local_samples": len(out_local_data),
+            "out_local_classes": len(test_classes - train_classes),
+        }
+
+        if len(in_local_data) > 0:
+            in_local_dataset = TensorDataset(
+                torch.stack(in_local_data), torch.stack(in_local_labels)
+            )
+            in_local_loader = DataLoader(
+                in_local_dataset, batch_size=testloader.batch_size
+            )
+            in_local_results.update(
+                self._evaluate_partition(in_local_loader, "in_local")
+            )
+
+        if len(out_local_data) > 0:
+            out_local_dataset = TensorDataset(
+                torch.stack(out_local_data), torch.stack(out_local_labels)
+            )
+            out_local_loader = DataLoader(
+                out_local_dataset, batch_size=testloader.batch_size
+            )
+            out_local_results.update(
+                self._evaluate_partition(out_local_loader, "out_local")
+            )
+
+        return in_local_results, out_local_results
 
     def fit(
         self,
@@ -198,10 +294,10 @@ class Client(fl.client.NumPyClient):
 
         config.run_config["cid"] = self.cid
 
-        log(
-            logging.INFO,
-            f"[client_{self.cid}] lr: {config.run_config['learning_rate']}",
-        )
+        # log(
+        #     logging.INFO,
+        #     f"[client_{self.cid}] lr: {config.run_config['learning_rate']}",
+        # )
 
         # def _changing_sparsity(net: nn.Module, sparsity: float) -> None:
         #     """Change the sparsity of the SWAT layers."""
@@ -227,38 +323,20 @@ class Client(fl.client.NumPyClient):
             self.working_dir,
         )
 
-        # Check if the mask has been used
-        # trained_parameters = generic_get_parameters(self.net)
-        # if config.extra["mask"]:
-        #     # Estract the mask from the parameters
-        #     mask = [param != 0 for param in trained_parameters]
-        #     # Save the mask in the output dir
-        #     mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-        #     with open(mask_path, "wb") as fw:
-        #         pickle.dump(mask, fw)
-
         metrics["learning_rate"] = config.run_config["learning_rate"]
 
-        # Saving binary mask for masks overlap
         updated_parameters = generic_get_parameters(self.net)
-        # saving the mask of the local-update
-        if config.extra["mask"]:
-            # Estract the mask from the parameters
-            # mask = [param != 0 for param in trained_parameters]
-            mask = [param != 0 for param in updated_parameters]
-            # Save the mask in the output dir
-            file_name = (
-                f"mask_{config.run_config['curr_round']}"
-                f"_client_{config.run_config['cid']}.pickle"
-            )
-            mask_path = self.working_dir / "client_masks" / file_name
-            if not mask_path.exists():
-                mask_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(mask_path, "wb") as fw:
-                # save the binary mask
-                pickle.dump(mask, fw)
 
-        # print(f"[CLIENT!!!] the metrics are: {metrics}")
+        # if config.extra["in_out_eval"]:
+        #     # Post training evaluation
+        #     testloader = self.fed_dataloader_gen(True, config.dataloader_config)
+        #     server_results = self._evaluate_partition(testloader, "server")
+        #     in_local_results, out_local_results = self._evaluate_in_out_local(
+        #         trainloader, testloader
+        #     )
+        #     metrics.update(server_results)
+        #     metrics.update(in_local_results)
+        #     metrics.update(out_local_results)
 
         return (
             # trained_parameters,
@@ -301,12 +379,7 @@ class Client(fl.client.NumPyClient):
             parameters,
             config.net_config,
         )
-        sparsity = print_nonzeros(
-            self.net, f"[client_{self.cid}] before first evaluation:"
-        )
-
-        # layer_sparsity = get_layer_sparsity(self.net)
-        # print(f"[client_{self.cid}] layer sparsity: ", layer_sparsity)
+        sparsity = get_nonzeros(self.net)
 
         testloader = self.dataloader_gen(
             self.cid,
@@ -320,26 +393,10 @@ class Client(fl.client.NumPyClient):
             config.run_config,
             self.working_dir,
         )
-        # end_time = time.time() !?
-        # print(f"[client_{self.cid}] evaluation time: {end_time - start_time}")
-
-        # Check, from the config, if the mask has to be used
-        # if config.extra["mask"]:
-        #     mask_path = self.working_dir / f"mask_{self.cid}.pickle"
-        #     if mask_path.exists():
-        #         with open(mask_path, "rb") as f:
-        #             mask = pickle.load(f)
-        #         # Apply the to the parameters
-        #         parameters = [
-        #             param * m for param, m in zip(parameters, mask, strict=True)
-        #         ]
-
-        # trained_parameters = generic_get_parameters(self.net)
 
         # Saving the mask of the global model
         if config.extra["mask"]:
             # Estract the mask from the parameters
-            # mask = [param != 0 for param in trained_parameters]
             mask = [param != 0 for param in parameters]
             # Save the mask in the output dir
             mask_path = (
@@ -355,7 +412,6 @@ class Client(fl.client.NumPyClient):
         )
 
         metrics["sparsity"] = sparsity
-        # metrics["layer_sparsity"] = layer_sparsity
 
         return loss, num_samples, metrics
 
@@ -429,6 +485,7 @@ def get_client_generator(
     dataloader_gen: ClientDataloaderGen,
     train: TrainFunc,
     test: TestFunc,
+    fed_dataloader_gen: FedDataloaderGen,
 ) -> ClientGen:
     """Return a function which creates a new Client.
 
@@ -480,6 +537,7 @@ def get_client_generator(
             dataloader_gen,
             train,
             test,
+            fed_dataloader_gen,
         )
 
     return client_generator

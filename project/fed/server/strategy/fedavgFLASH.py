@@ -54,24 +54,6 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 
 
 def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
-    """Compute weighted average."""
-    # Calculate the total number of examples used during training
-    num_examples_total = sum([num_examples for _, num_examples in results])
-
-    # Create a list of weights, each multiplied by the related number of examples
-    weighted_weights = [
-        [layer * num_examples for layer in weights] for weights, num_examples in results
-    ]
-
-    # Compute average weights of each layer
-    weights_prime: NDArrays = [
-        reduce(np.add, layer_updates) / num_examples_total
-        for layer_updates in zip(*weighted_weights)
-    ]
-    return weights_prime
-
-
-def aggregate_NZ(results: list[tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average for non-zero weights."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
@@ -92,6 +74,18 @@ def aggregate_NZ(results: list[tuple[NDArrays, int]]) -> NDArrays:
         for layer_updates in zip(*weighted_weights)
     ]
     return weights_prime
+
+
+def compute_layer_density(layer):
+    return np.count_nonzero(layer) / layer.size
+
+
+def topk_sparsify(layer, density):
+    k = int(density * layer.size)
+    if k >= layer.size:
+        return layer
+    threshold = np.partition(np.abs(layer).flatten(), -k)[-k]
+    return layer * (np.abs(layer) >= threshold)
 
 
 # pylint: disable=line-too-long
@@ -266,10 +260,9 @@ class FedAvgFLASH(Strategy):
         results: list[tuple[ClientProxy, FitRes]],
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
-        """Aggregate fit results using weighted average."""
+        """Aggregate fit results using weighted average and adjust sparsity."""
         if not results:
             return None, {}
-        # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
             return None, {}
 
@@ -278,77 +271,55 @@ class FedAvgFLASH(Strategy):
             for _, fit_res in results
         ]
 
-        def topk_sparsify(layer, sparsity):
-            """Apply top-k sparsification to a given layer."""
-            k = int((1 - sparsity) * layer.size)  # number of elements to keep
-            if k <= 0:
-                return np.zeros_like(layer)  # all elements are zeroed out
-            # Find the threshold value
-            threshold = np.partition(np.abs(layer).flatten(), -k)[-k]
-            # Zero out elements below the threshold
-            mask = np.abs(layer) >= threshold
-            return layer * mask
-
         if server_round == 1:
-            # SENSITIVITY ANALYSIS
-            # FLASH
-            # print(f"[FLASH_test] START")
-            # print(f"Server round: {server_round}")
-            # Aggregate parameters
-            aggregated_updates = aggregate_NZ(weights_results)
-            # check parameters sparsity level
-            # sparsity_level = 0
-            # size = 0
-            # for layer in aggregated_updates:
-            #     sparsity_level += np.count_nonzero(layer)
-            #     size += np.prod(layer.shape)
-            # print(f"Sparsity level: {1 - sparsity_level/size}")
+            # Extract target sparsity from the first result's metrics
+            target_sparsity = results[0][1].metrics["sparsity"]
+            target_density = 1 - int(target_sparsity)
 
-            layer_sparsity = [[] for _ in range(len(aggregated_updates))]  # type: ignore[var-annotated]
-            layer_sensitivity = [[] for _ in range(len(layer_sparsity))]  # type: ignore[var-annotated]
-            # target_sparsity = 0.95 # this value should be retrived from the metrics
+            # Step 1: Compute average density per layer
+            avg_densities = []
+            for layer_idx in range(len(weights_results[0][0])):
+                layer_densities = [
+                    compute_layer_density(client_weights[layer_idx])
+                    for client_weights, _ in weights_results
+                ]
+                avg_densities.append(np.mean(layer_densities))
 
-            # layer sensitivity analysis
-            # computing layer sensitivity
-            for _, fit_res in results:
-                param = parameters_to_ndarrays(fit_res.parameters)
-                i = 0
-                for layer in param:
-                    layer_size = np.prod(layer.shape)
-                    layer_sparsity[i].append(1 - np.count_nonzero(layer) / layer_size)
-                    i += 1
-            # print(f"Layer sparsity: {layer_sparsity}")
-            layer_sensitivity = np.mean(layer_sparsity, axis=1)
+            # Step 2: Aggregate the values
+            aggregated_updates = aggregate(weights_results)
 
-            # compute parameter sparsity
-            # parameter_sparsity = [[] for _ in range(len(aggregated_updates))]
-            # i = 0
-            # for p in aggregated_updates:
-            #     parameter_sparsity[i] = (1 - np.count_nonzero(p) / np.prod(p.shape))
-            #     i += 1
+            # Step 3: Compute sparsity reached
+            total_params = sum(layer.size for layer in aggregated_updates)
+            nonzero_params = sum(
+                int(layer.size * density)
+                for layer, density in zip(aggregated_updates, avg_densities)
+            )
+            reached_density = nonzero_params / total_params
 
-            # apply layer sensitivity to aggregated_updates
-            sparsified_parameters = []
-            for i, layer in enumerate(aggregated_updates):
-                sparsified_parameters.append(topk_sparsify(layer, layer_sensitivity[i]))
+            # Step 4: Calculate adjustment
+            adjustment_factor = target_density / reached_density
 
-            parameters_aggregated = ndarrays_to_parameters(sparsified_parameters)
+            # Step 5: Apply adjustment to average density to obtain sensitivity
+            sensitivities = [
+                min(1.0, density * adjustment_factor) for density in avg_densities
+            ]
 
+            # Step 6: Prune the aggregated value with the sensitivity
+            pruned_parameters = [
+                topk_sparsify(layer, sensitivity)
+                for layer, sensitivity in zip(aggregated_updates, sensitivities)
+            ]
+
+            parameters_aggregated = ndarrays_to_parameters(pruned_parameters)
         else:
             parameters_aggregated = ndarrays_to_parameters(aggregate(weights_results))
 
-        # Convert results
-        # weights_results = [
-        #     (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
-        #     for _, fit_res in results
-        # ]
-
-        # Aggregate custom metrics if aggregation fn was provided
+        # Aggregate custom metrics
         metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
             fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
-        elif server_round == 1:  # Only log this warning once
+        elif server_round == 1:
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
         return parameters_aggregated, metrics_aggregated

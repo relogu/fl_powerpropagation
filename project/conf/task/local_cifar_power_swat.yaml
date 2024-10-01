@@ -25,7 +25,7 @@ fit_config:
     learning_rate: 0.1
     final_learning_rate: 0.01
   # No extra config
-  extra: {mask: true, noise: 0.0}
+  extra: {in_out_eval: false, mask: true, noise: 0.0}
 
 # Client eval config
 eval_config:

@@ -46,7 +46,7 @@ wandb:
     # project: mlsys_tests_CIFAR100
     # project: mlsys_tests_CIFAR10
     # project: flash_tests_CIFAR10
-    project: ablation_tests
+    project: ICLR_CIFAR10_flash
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}

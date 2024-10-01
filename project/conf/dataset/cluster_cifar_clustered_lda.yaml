@@ -1,0 +1,39 @@
+---
+name: cifar${dataset.num_classes}_clustered_lda${dataset.lda_alpha}
+
+# Where to store data
+dataset_dir: /datasets/CIFAR${dataset.num_classes}
+
+# Folder of client folders
+# indexed by id, containing train and test
+# data in .pt format
+# partition_dir: /datasets/CIFAR10/lda-01
+partition_dir: /datasets/CIFAR${dataset.num_classes}/clustered_lda_${dataset.lda_alpha}
+
+# How many clients to create
+num_clients: 100
+num_classes: 10
+
+# How large should the test set of each client
+# be relative to the train set
+val_ratio: 0.1
+
+# Seed for partition generation
+seed: 1337
+
+# If the partition labels 
+# should be independent and identically distributed 
+iid: false
+
+# If the partition labels should follow a power law
+# distribution
+power_law: false
+
+# If the partition labels should follow a lda distribution
+lda: true
+# lda_alpha: 1.0
+lda_alpha: 1.0
+num_clusters: 4
+
+# If the partition labels should be balanced
+balance: false

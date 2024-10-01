@@ -17,10 +17,13 @@
 # pylint: disable=invalid-name
 
 
+from collections import Counter, defaultdict
 from typing import Optional, Union
 
 import numpy as np
 from numpy.random import BitGenerator, Generator, SeedSequence
+from sklearn.cluster import KMeans
+from sklearn.metrics import euclidean_distances
 import torch
 
 # XY = tuple[np.ndarray, np.ndarray] | tuple[torch.Tensor, torch.Tensor]  # speech command
@@ -408,6 +411,10 @@ def create_lda_partitions(
     x, y = shuffle(x, y)
     x, y = sort_by_label(x, y)
 
+    # Check label distribution
+    unique, counts = np.unique(y, return_counts=True)
+    print(dict(zip(unique, counts)))
+
     if (x.shape[0] % num_partitions) and (not accept_imbalanced):
         raise ValueError(
             """Total number of samples must be a multiple of `num_partitions`.
@@ -473,3 +480,306 @@ def create_lda_partitions(
         )
 
     return partitions, dirichlet_dist
+
+
+# ?!
+# def create_lda_partitions_labels_cluster(
+#     dataset: tuple[np.ndarray, np.ndarray],
+#     dirichlet_dist: Optional[np.ndarray] = None,
+#     num_partitions: int = 100,
+#     concentration: Union[float, np.ndarray, list[float]] = 0.5,
+#     accept_imbalanced: bool = False,
+#     num_clusters: int = 4,
+#     seed: Optional[Union[int, SeedSequence, BitGenerator, Generator]] = None,
+# ) -> tuple[list[tuple[np.ndarray, np.ndarray]], np.ndarray]:
+#     X, y = dataset
+#     unique_labels = np.unique(y)
+#     num_classes = len(unique_labels)
+
+#     # Create a mapping of original labels to consecutive integers
+#     label_map = {label: i for i, label in enumerate(unique_labels)}
+#     reverse_label_map = {i: label for label, i in label_map.items()}
+
+#     # Map the labels to consecutive integers
+#     y_mapped = np.array([label_map[label] for label in y])
+
+#     # Determine number of clusters based on number of classes
+#     num_clusters = (
+#         2 if num_classes <= 10 else num_clusters
+#     )  # Adjust this logic as needed
+
+#     # Sort the dataset by mapped labels
+#     sorted_indices = np.argsort(y_mapped)
+#     X_sorted = X[sorted_indices]
+#     y_sorted = y_mapped[sorted_indices]
+
+#     # Split the sorted dataset into clusters
+#     samples_per_cluster = len(y) // num_clusters
+#     clustered_datasets = []
+#     for i in range(num_clusters):
+#         start_idx = i * samples_per_cluster
+#         end_idx = (i + 1) * samples_per_cluster if i < num_clusters - 1 else len(y)
+#         clustered_datasets.append(
+#             (X_sorted[start_idx:end_idx], y_sorted[start_idx:end_idx])
+#         )
+
+#     # Print summary of clusters
+#     print("\nClass distribution summary for each cluster:")
+#     for i, (cluster_X, cluster_y) in enumerate(clustered_datasets):
+#         cluster_summary = Counter(cluster_y)
+#         print(f"Cluster {i}:")
+#         print(f"  Samples: {len(cluster_y)}")
+#         print(f"  Class distribution: {dict(cluster_summary)}")
+#         print(f"  Unique labels: {np.unique(cluster_y)}")
+#         print()
+
+#     # Distribute partitions among clusters
+#     partitions_per_cluster = num_partitions // num_clusters
+#     remaining_partitions = num_partitions % num_clusters
+
+#     all_partitions = []
+#     for i, cluster_dataset in enumerate(clustered_datasets):
+#         cluster_X, cluster_y = cluster_dataset
+#         cluster_partitions = partitions_per_cluster + (
+#             1 if i < remaining_partitions else 0
+#         )
+#         print(
+#             f"Creating partitions for cluster {i}, num_partitions={cluster_partitions}"
+#         )
+
+#         # Create label mapping for this cluster
+#         cluster_unique_labels = np.unique(cluster_y)
+#         label_map = {label: idx for idx, label in enumerate(cluster_unique_labels)}
+#         reverse_label_map = {idx: label for label, idx in label_map.items()}
+
+#         # Map labels to consecutive integers
+#         mapped_y = np.array([label_map[label] for label in cluster_y])
+
+#         # Use the existing LDA partition function for each cluster
+#         cluster_partitions, _ = create_lda_partitions(
+#             dataset=(cluster_X, mapped_y),
+#             num_partitions=cluster_partitions,
+#             concentration=concentration,
+#             seed=seed,
+#         )
+
+#         # Remap labels back to original values
+#         remapped_partitions = []
+#         for partition_X, partition_y in cluster_partitions:
+#             remapped_y = np.array([reverse_label_map[label] for label in partition_y])
+#             remapped_partitions.append((partition_X, remapped_y))
+
+#         for j, (partition_X, partition_y) in enumerate(remapped_partitions):
+#             partition_summary = Counter(partition_y)
+#             print(f"  Partition {j}: {dict(partition_summary)}")
+
+#         all_partitions.extend(remapped_partitions)
+
+#     # Map the labels back to their original values
+#     # all_partitions = [
+#     #     (partition_X, np.array([reverse_label_map[label] for label in partition_y]))
+#     #     for partition_X, partition_y in all_partitions
+#     # ]
+
+#     # Print summary of partitions
+#     print("\nPartition distribution after clustering and LDA:")
+#     for i, (partition_X, partition_y) in enumerate(all_partitions):
+#         partition_summary = Counter(partition_y)
+#         print(f"Partition {i} unique labels: {np.unique(partition_y)}")
+
+#     # Calculate and print total samples and clients
+#     total_samples = sum(len(partition_y) for _, partition_y in all_partitions)
+#     total_clients = len(all_partitions)
+#     print(f"\nTotal samples across all partitions: {total_samples}")
+#     print(f"Total clients: {total_clients}")
+#     print(f"Original unique labels: {unique_labels}")
+
+#     return all_partitions, dirichlet_dist
+
+
+# def create_clustered_lda_partitions(
+#     dataset: XY,
+#     num_partitions: int = 100,
+#     num_clusters: int = 5,
+#     concentration: Union[float, np.ndarray, list[float]] = 0.5,
+#     seed: Optional[Union[int, SeedSequence, BitGenerator, Generator]] = None,
+# ) -> tuple[XYList, np.ndarray]:
+#     """Create imbalanced non-iid partitions using Latent Dirichlet Allocation (LDA) with
+#     class clustering.
+
+#     Args:
+#         dataset (XY): Dataset containing samples X and labels Y.
+#         num_partitions (int, optional): Number of partitions to be created. Defaults to 100.
+#         num_clusters (int, optional): Number of clusters to group clients. Defaults to 5.
+#         concentration (float, np.ndarray, List[float]): Dirichlet Concentration parameter.
+#         seed (None, int, SeedSequence, BitGenerator, Generator): A seed for random number generation.
+
+#     Returns:
+#         Tuple[XYList, numpy.ndarray]: List of XYList containing partitions for each dataset
+#         and the dirichlet probability density functions.
+#     """
+#     x, y = dataset
+#     x, y = shuffle(x, y)
+#     x, y = sort_by_label(x, y)
+
+#     classes = np.unique(y)
+#     num_classes = len(classes)
+
+#     # Step 1: Cluster clients
+#     clients_per_cluster = num_partitions // num_clusters
+#     remaining_clients = num_partitions % num_clusters
+
+#     # Step 2: Assign classes to clusters
+#     classes_per_cluster = num_classes // num_clusters
+#     remaining_classes = num_classes % num_clusters
+
+#     class_assignments = []
+#     for i in range(num_clusters):
+#         cluster_classes = classes[
+#             i * classes_per_cluster : (i + 1) * classes_per_cluster
+#         ]
+#         if i < remaining_classes:
+#             cluster_classes = np.append(cluster_classes, classes[-(i + 1)])
+#         class_assignments.append(cluster_classes)
+
+#     # Step 3: LDA partitioning within each cluster
+#     partitions = []
+#     dirichlet_dist = np.zeros((num_partitions, num_classes))
+
+#     rng = np.random.default_rng(seed)
+
+#     current_partition = 0
+#     for i in range(num_clusters):
+#         cluster_classes = class_assignments[i]
+#         num_cluster_partitions = clients_per_cluster + (
+#             1 if i < remaining_clients else 0
+#         )
+
+#         # Filter dataset for current cluster classes
+#         mask = np.isin(y, cluster_classes)
+#         cluster_x, cluster_y = x[mask], y[mask]
+
+#         # Create LDA partitions for this cluster
+#         if isinstance(concentration, float):
+#             cluster_concentration = np.full(len(cluster_classes), concentration)
+#         else:
+#             cluster_concentration = np.array([
+#                 concentration[c] for c in cluster_classes
+#             ])
+
+#         cluster_dirichlet = rng.dirichlet(
+#             alpha=cluster_concentration, size=num_cluster_partitions
+#         )
+
+#         cluster_partitions, _ = create_lda_partitions(
+#             dataset=(cluster_x, cluster_y),
+#             dirichlet_dist=cluster_dirichlet,
+#             num_partitions=num_cluster_partitions,
+#             concentration=cluster_concentration,
+#             accept_imbalanced=True,
+#             seed=rng,
+#         )
+
+#         partitions.extend(cluster_partitions)
+
+#         # Update global dirichlet distribution
+#         end_partition = current_partition + num_cluster_partitions
+#         dirichlet_dist[
+#             current_partition:end_partition, np.isin(classes, cluster_classes)
+#         ] = cluster_dirichlet
+#         current_partition = end_partition
+
+#     return partitions, dirichlet_dist
+
+
+# def create_incremental_class_partitions(
+#     dataset: XY,
+#     dirichlet_dist: Optional[np.ndarray] = None,
+#     num_partitions: int = 100,
+#     num_clusters: int = 5,
+#     initial_class_percentage: float = 0.2,
+#     concentration: Union[float, np.ndarray, list[float]] = 0.5,
+#     accept_imbalanced: bool = False,
+#     seed: Optional[Union[int, SeedSequence, BitGenerator, Generator]] = None,
+# ) -> tuple[XYList, np.ndarray]:
+#     """Create partitions where clients are grouped into clusters with an incremental
+#     number of classes.
+
+#     Args:
+#         dataset (XY): Dataset containing samples X and labels Y.
+#         dirichlet_dist (Optional[np.ndarray]): Previously generated distribution to be used.
+#         num_partitions (int): Number of partitions (clients) to be created.
+#         num_clusters (int): Number of clusters to group clients.
+#         initial_class_percentage (float): Percentage of classes for the initial cluster.
+#         concentration (Union[float, np.ndarray, List[float]]): Dirichlet concentration parameter.
+#         accept_imbalanced (bool): Whether to accept imbalanced output classes.
+#         seed (Optional[Union[int, SeedSequence, BitGenerator, Generator]]): Seed for random number generation.
+
+#     Returns:
+#         Tuple[XYList, np.ndarray]: List of (X, Y) tuples for each partition and the Dirichlet distribution.
+#     """
+#     x, y = dataset
+#     rng = np.random.default_rng(seed)
+
+#     # Shuffle the dataset
+#     indices = rng.permutation(len(x))
+#     x, y = x[indices], y[indices]
+
+#     # Get unique classes
+#     classes = np.unique(y)
+#     num_classes = len(classes)
+
+#     # Calculate the number of classes for each cluster
+#     initial_classes = max(1, int(num_classes * initial_class_percentage))
+#     remaining_classes = num_classes - initial_classes
+#     classes_per_cluster = [initial_classes] + [
+#         remaining_classes // (num_clusters - 1)
+#     ] * (num_clusters - 1)
+#     classes_per_cluster[-1] += remaining_classes % (
+#         num_clusters - 1
+#     )  # Add any leftover classes to the last cluster
+
+#     # Assign partitions to clusters
+#     partitions_per_cluster = [num_partitions // num_clusters] * num_clusters
+#     for i in range(num_partitions % num_clusters):
+#         partitions_per_cluster[i] += 1
+
+#     partitions = []
+#     if dirichlet_dist is None:
+#         dirichlet_dist = np.zeros((num_partitions, num_classes))
+
+#     class_start = 0
+#     partition_index = 0
+
+#     for cluster in range(num_clusters):
+#         cluster_classes = classes[
+#             class_start : class_start + classes_per_cluster[cluster]
+#         ]
+#         class_start += classes_per_cluster[cluster]
+
+#         # Get samples for current cluster classes
+#         cluster_mask = np.isin(y, cluster_classes)
+#         cluster_x, cluster_y = x[cluster_mask], y[cluster_mask]
+
+#         # Distribute samples among partitions in this cluster
+#         for _ in range(partitions_per_cluster[cluster]):
+#             if partition_index == num_partitions - 1 and not accept_imbalanced:
+#                 # Use all remaining samples for the last partition
+#                 partition_x, partition_y = cluster_x, cluster_y
+#             else:
+#                 # Randomly select samples for this partition
+#                 num_samples = len(cluster_x) // (partitions_per_cluster[cluster] - _)
+#                 indices = rng.choice(len(cluster_x), num_samples, replace=False)
+#                 partition_x, partition_y = cluster_x[indices], cluster_y[indices]
+#                 cluster_x = np.delete(cluster_x, indices, axis=0)
+#                 cluster_y = np.delete(cluster_y, indices)
+
+#             partitions.append((partition_x, partition_y))
+
+#             # Calculate class distribution for this partition
+#             unique, counts = np.unique(partition_y, return_counts=True)
+#             dirichlet_dist[partition_index, unique] = counts / len(partition_y)
+
+#             partition_index += 1
+
+#     return partitions, dirichlet_dist

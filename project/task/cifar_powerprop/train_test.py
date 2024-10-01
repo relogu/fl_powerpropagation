@@ -5,7 +5,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import cast
 
-import logging
 from logging import ERROR
 from flwr.common import log
 from project.fed.utils.utils import (
@@ -203,7 +202,7 @@ def get_train_and_prune(
         _working_dir: Path,
     ) -> tuple[int, dict]:
         """Training and pruning process."""
-        log(logging.DEBUG, "Start training")
+        # log(logging.DEBUG, "Start training")
 
         average_exp = compute_average_exponent(net)
         before_train_net = deepcopy(net)
@@ -301,6 +300,7 @@ def get_train_and_prune(
 
         # get the amount of parameters to prune from the first module that has sparsity
         metrics[1]["exponet"] = average_exp
+        # print(f"[client_{_config['cid']}] metrics: {metrics}")
 
         torch.cuda.empty_cache()
 

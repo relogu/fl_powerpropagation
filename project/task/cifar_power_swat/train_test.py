@@ -128,6 +128,90 @@ def train(  # pylint: disable=too-many-arguments
     }
 
 
+def fixed_train(  # pylint: disable=too-many-arguments
+    net: nn.Module,
+    trainloader: DataLoader,
+    _config: dict,
+    _working_dir: Path,
+) -> tuple[int, dict]:
+    """Train the network on the training set.
+
+    Parameters
+    ----------
+    net : nn.Module
+        The neural network to train.
+    trainloader : DataLoader
+        The DataLoader containing the data to train the network on.
+    _config : Dict
+        The configuration for the training.
+        Contains the device, number of epochs and learning rate.
+        Static type checking is done by the TrainConfig class.
+
+    Returns
+    -------
+    Tuple[int, Dict]
+        The number of samples used for training,
+        the loss, and the accuracy of the input model on the given data.
+    """
+    if len(cast(Sized, trainloader.dataset)) == 0:
+        raise ValueError(
+            "Trainloader can't be 0, exiting...",
+        )
+
+    config: TrainConfig = TrainConfig(**_config)
+    del _config
+
+    # FLASH
+    mask = []
+    for param in net.parameters():
+        mask.append((param != 0).float())
+
+    net.to(config.device)
+    net.train()
+
+    criterion = nn.CrossEntropyLoss()
+
+    optimizer = torch.optim.SGD(
+        net.parameters(),
+        lr=config.learning_rate,
+        weight_decay=0.001,
+    )
+
+    final_epoch_per_sample_loss = 0.0
+    num_correct = 0
+    for _ in range(config.epochs):
+        final_epoch_per_sample_loss = 0.0
+        num_correct = 0
+        for data, target in trainloader:
+            data, target = (
+                data.to(
+                    config.device,
+                ),
+                target.to(config.device),
+            )
+            optimizer.zero_grad()
+            output = net(data)
+            loss = criterion(output, target)
+            final_epoch_per_sample_loss += loss.item()
+            num_correct += (output.max(1)[1] == target).clone().detach().sum().item()
+            loss.backward()
+
+            # FLASH
+            # apply the mask to the gradients
+            with torch.no_grad():
+                for param, m in zip(net.parameters(), mask, strict=True):
+                    param.grad *= m.to(config.device)
+
+            optimizer.step()
+
+    return len(cast(Sized, trainloader.dataset)), {
+        "train_loss": final_epoch_per_sample_loss / len(
+            cast(Sized, trainloader.dataset)
+        ),
+        "train_accuracy": float(num_correct) / len(cast(Sized, trainloader.dataset)),
+    }
+
+
 def get_train_and_prune(
     alpha: float = 1.0, amount: float = 0.0, pruning_method: str = "l1"
 ) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
@@ -155,6 +239,7 @@ def get_train_and_prune(
         before_train_net = deepcopy(net)
         # train the network, with the current parameter
         metrics = train(
+            # metrics = fixed_train(
             net=net,
             trainloader=trainloader,
             _config=_config,

@@ -81,26 +81,31 @@ class CidWindowCriterion:
         )
 
 
-def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
-    """Compute weighted average."""
+def aggregate_NZ(results: list[tuple[NDArrays, int]]) -> NDArrays:
+    """Compute weighted average for non-zero weights."""
     # Calculate the total number of examples used during training
     num_examples_total = sum([num_examples for _, num_examples in results])
 
     # Create a list of weights, each multiplied by the related number of examples
     weighted_weights = [
-        [layer * num_examples for layer in weights] for weights, num_examples in results
+        [(layer * num_examples, layer != 0) for layer in weights]
+        for weights, num_examples in results
     ]
 
     # Compute average weights of each layer
     weights_prime: NDArrays = [
-        reduce(np.add, layer_updates) / num_examples_total
+        np.divide(
+            np.sum([mask * layer for layer, mask in layer_updates], axis=0),
+            num_examples_total,
+            where=(num_examples_total > 0),
+        )
         for layer_updates in zip(*weighted_weights)
     ]
     return weights_prime
 
 
 # pylint: disable=line-too-long
-class FedAvgContinual(Strategy):
+class FedAvgCFLASH(Strategy):
     """Federated Averaging strategy.
 
     Implementation based on https://arxiv.org/abs/1602.05629
@@ -276,10 +281,11 @@ class FedAvgContinual(Strategy):
             config = self.on_evaluate_config_fn(server_round)
         evaluate_ins = EvaluateIns(parameters, config)
 
+        # Sample clients
         sample_size, min_num_clients = self.num_evaluation_clients(
             client_manager.num_available()
         )
-        # server_round = server_round + 100
+
         lower_bound, upper_bound = get_clients_window_range(current_round=server_round)
 
         # sample the clients from the window corrisponding to the current round
@@ -320,12 +326,68 @@ class FedAvgContinual(Strategy):
         if not self.accept_failures and failures:
             return None, {}
 
-        # Convert results
         weights_results = [
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             for _, fit_res in results
         ]
-        parameters_aggregated = ndarrays_to_parameters(aggregate(weights_results))
+
+        def topk_sparsify(layer, sparsity):
+            """Apply top-k sparsification to a given layer."""
+            k = int((1 - sparsity) * layer.size)  # number of elements to keep
+            if k <= 0:
+                return np.zeros_like(layer)  # all elements are zeroed out
+            # Find the threshold value
+            threshold = np.partition(np.abs(layer).flatten(), -k)[-k]
+            # Zero out elements below the threshold
+            mask = np.abs(layer) >= threshold
+            return layer * mask
+
+        if server_round == 1:
+            # SENSITIVITY ANALYSIS
+            # FLASH
+            # print(f"[FLASH_test] START")
+            # print(f"Server round: {server_round}")
+            # Aggregate parameters
+            aggregated_updates = aggregate_NZ(weights_results)
+            # check parameters sparsity level
+            # sparsity_level = 0
+            # size = 0
+            # for layer in aggregated_updates:
+            #     sparsity_level += np.count_nonzero(layer)
+            #     size += np.prod(layer.shape)
+            # print(f"Sparsity level: {1 - sparsity_level/size}")
+
+            layer_sparsity = [[] for _ in range(len(aggregated_updates))]  # type: ignore[var-annotated]
+            layer_sensitivity = [[] for _ in range(len(layer_sparsity))]  # type: ignore[var-annotated]
+            # target_sparsity = 0.95 # this value should be retrived from the metrics
+
+            # layer sensitivity analysis
+            # computing layer sensitivity
+            for _, fit_res in results:
+                param = parameters_to_ndarrays(fit_res.parameters)
+                i = 0
+                for layer in param:
+                    layer_size = np.prod(layer.shape)
+                    layer_sparsity[i].append(1 - np.count_nonzero(layer) / layer_size)
+                    i += 1
+            # print(f"Layer sparsity: {layer_sparsity}")
+            layer_sensitivity = np.mean(layer_sparsity, axis=1)
+            sparsified_parameters = []
+            for i, layer in enumerate(aggregated_updates):
+                sparsified_parameters.append(topk_sparsify(layer, layer_sensitivity[i]))
+
+            parameters_aggregated = ndarrays_to_parameters(sparsified_parameters)
+
+        else:
+            parameters_aggregated = ndarrays_to_parameters(
+                aggregate_NZ(weights_results)
+            )
+
+        # Convert results
+        # weights_results = [
+        #     (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
+        #     for _, fit_res in results
+        # ]
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
@@ -374,9 +436,9 @@ class FedAvgContinual(Strategy):
 
             # Calculate averages
             # if window_test_acc:
-            #     metrics_aggregated["window_test_acc"] = sum(
-            #         w for w in window_test_acc
-            #     ) / len(window_test_acc)
+            #     metrics_aggregated["window_test_acc"] = sum(window_test_acc) / len(
+            #         window_test_acc
+            #     )
             # if prev_window_test_acc:
             #     metrics_aggregated["prev_window_test_acc"] = sum(
             #         prev_window_test_acc

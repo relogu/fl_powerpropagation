@@ -245,6 +245,38 @@ def get_checkpoint_index(
     return max(indicies, default=-1) + 1
 
 
+def get_clients_window_range(
+    current_round: int,
+    window_size: int = 50,  # CIFAR10
+    # window_size: int = 25, # CIFAR100
+    window_training_rounds: int = 200,
+    num_clients: int = 100,
+    overlap: int = 0,
+) -> tuple[int, int]:
+    """Get the clients window range for the round.
+
+    Parameters
+    ----------
+    round : int
+        The round.
+    window_size : int
+        The window size.
+    num_clients : int
+        The number of clients.
+    overlap : int
+        The overlap between windows.
+
+    Returns
+    -------
+    Tuple[int, int]
+        The window range.
+    """
+    start = ((current_round // window_training_rounds) * window_size) % num_clients
+    end = start + window_size + overlap
+    # print(f"RANGE: start: {start}, end: {end}")
+    return int(start), int(end)
+
+
 def save_files(
     working_dir: Path,
     output_dir: Path,
