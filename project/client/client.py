@@ -395,13 +395,17 @@ class Client(fl.client.NumPyClient):
         )
 
         # Saving the mask of the global model
-        if config.extra["mask"]:
+        if config.extra["mask"] and (config.extra["curr_round"] % 10 == 0):
             # Estract the mask from the parameters
             mask = [param != 0 for param in parameters]
             # Save the mask in the output dir
-            mask_path = (
-                self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
-            )
+            file_name = f"mask_{config.run_config['curr_round']}.pickle"
+            mask_path = self.working_dir / "global_masks" / file_name
+            if not mask_path.exists():
+                mask_path.parent.mkdir(parents=True, exist_ok=True)
+            # mask_path = (
+            #     self.working_dir / f"mask_{config.run_config['curr_round']}.pickle"
+            # )
             with open(mask_path, "wb") as fw:
                 # save the binary mask
                 pickle.dump(mask, fw)
