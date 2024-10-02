@@ -2,9 +2,9 @@
 defaults:
   - _self_
   - task: cifar_resnet18
-  - fed: cluster_cifar
-  - strategy: fedavg
-  - dataset: cluster_cifar_lda
+  - fed: cifar_resnet18
+  - strategy: fedavgFLASH
+  - dataset: cifar_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -42,17 +42,14 @@ test_clients:
 # change the name
 wandb:
   setup:
-    project: cleaning
+    project: CIFAR_SparsyFed
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
-      - swat
-      - alpha_${task.alpha}
-      - sparsity_${task.sparsity}
       - patitioning_${dataset.name}
     entity: null
     mode: online
-    name: ${task.model_and_data}_${task.train_structure}--a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
+    name: ${task.model_and_data}_${task.train_structure}-s${task.sparsity}-${dataset.name}-${strategy.name}
 
 # For Ray cluster usage
 # leave null unless you need 

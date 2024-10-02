@@ -1,5 +1,0 @@
----
-name: FedAvgContinual
-
-init:
-  _target_: project.fed.server.strategy.fedavgContinual.FedAvgContinual

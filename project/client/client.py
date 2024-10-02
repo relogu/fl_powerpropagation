@@ -11,7 +11,6 @@ import flwr as fl
 from flwr.common import NDArrays
 from pydantic import BaseModel
 from torch import nn
-import torch
 
 from project.fed.utils.utils import (
     generic_get_parameters,
@@ -175,8 +174,6 @@ class Client(fl.client.NumPyClient):
 
         updated_parameters = generic_get_parameters(self.net)
 
-        torch.cuda.empty_cache()
-
         return (
             updated_parameters,
             num_samples,
@@ -237,8 +234,6 @@ class Client(fl.client.NumPyClient):
         )
 
         metrics["sparsity"] = sparsity
-
-        torch.cuda.empty_cache()
 
         return loss, num_samples, metrics
 

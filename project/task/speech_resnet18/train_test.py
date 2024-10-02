@@ -134,7 +134,7 @@ def train(  # pylint: disable=too-many-arguments
                 )
                 loss.backward()
                 optimizer.step()
-    torch.cuda.empty_cache()
+
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
             cast(Sized, trainloader.dataset)
@@ -230,7 +230,7 @@ def fixed_train(  # pylint: disable=too-many-arguments
                         param.grad *= m.to(config.device)
 
                 optimizer.step()
-    torch.cuda.empty_cache()
+
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
             cast(Sized, trainloader.dataset)
@@ -355,7 +355,7 @@ def get_flash_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
-        torch.cuda.empty_cache()
+
         return metrics
 
     return train_and_prune
@@ -441,7 +441,6 @@ def test(
             correct += (predicted == labels).sum().item()
 
             # del images, labels, outputs, predicted
-    torch.cuda.empty_cache()
 
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
@@ -516,7 +515,7 @@ def get_fed_eval_fn(
             config.run_config,
             working_dir,
         )
-        torch.cuda.empty_cache()
+
         return loss, metrics
 
     return fed_eval_fn

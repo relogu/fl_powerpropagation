@@ -251,11 +251,8 @@ def get_fixed_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
-            torch.cuda.empty_cache()
 
         metrics[1]["sparsity"] = amount
-
-        torch.cuda.empty_cache()
 
         return metrics
 
@@ -313,6 +310,8 @@ def get_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
+
+        metrics[1]["sparsity"] = amount
 
         return metrics
 

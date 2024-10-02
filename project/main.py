@@ -282,7 +282,7 @@ def main(cfg: DictConfig) -> None:
                 dataloader_gen=client_dataloader_gen,
                 train=train_func,
                 test=test_func,
-                fed_dataloader_gen=fed_dataloater_gen,  # for the in-out local tests !?
+                fed_dataloader_gen=fed_dataloater_gen,
             )
 
             # Seed everything to maybe improve reproduceability

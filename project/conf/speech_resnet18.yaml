@@ -1,10 +1,10 @@
 ---
 defaults:
   - _self_
-  - task: cluster_cifar_powerprop_pruning
-  - fed: cluster_cifar
+  - task: speech_resnet18
+  - fed: speech_resnet18
   - strategy: fedavg
-  - dataset: cluster_cifar_lda
+  - dataset: speech_lda
 
 # If running the same experiment multiple times
 # you may wish to save results to the same directory
@@ -35,29 +35,21 @@ use_wandb: true
 # Test without Ray to to enable easy error detection
 test_clients:
   all: false
-  one: true
+  one: false
 
 # Wandb configuration
 # add whatever tags you like
 # change the name
 wandb:
   setup:
-    # project: final_tests
-    # project: mlsys_tests_CIFAR100
-    # project: mlsys_tests_CIFAR10
-    # project: flash_tests_CIFAR10
-    project: continual_learning_in_out
+    project: Speech_SparsyFed
     tags:
       - strategy_${strategy.name}
       - seed_${fed.seed}
-      - powerprop
-      - alpha_${task.alpha}
       - patitioning_${dataset.name}
     entity: null
-    # id: k4rytjzf
-    # resume: auto
     mode: online
-    name: powerprop-a${task.alpha}-s${task.sparsity}-${dataset.name}-${strategy.name}-e${task.fit_config.run_config.epochs}-lr${task.fit_config.run_config.learning_rate}
+    name: ${task.model_and_data}_${task.train_structure}-s${task.sparsity}-${dataset.name}-${strategy.name}
 
 # For Ray cluster usage
 # leave null unless you need 

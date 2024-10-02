@@ -10,22 +10,6 @@ from omegaconf import DictConfig
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 
-from project.task.cifar.dispatch import (
-    dispatch_config as dispatch_cifar_config,
-)
-
-from project.task.cifar_powerprop.dispatch import (
-    dispatch_config as dispatch_cifar_powerprop_config,
-)
-
-from project.task.cifar_swat.dispatch import (
-    dispatch_config as dispatch_cifar_swat_config,
-)
-
-from project.task.cifar_power_swat.dispatch import (
-    dispatch_config as dispatch_cifar_power_swat_config,
-)
-
 
 from project.task.cifar_resnet18.dispatch import (
     dispatch_config as dispatch_resnet18_config,
@@ -33,15 +17,6 @@ from project.task.cifar_resnet18.dispatch import (
 from project.task.cifar_resnet18.dispatch import dispatch_data as dispatch_resnet18_data
 from project.task.cifar_resnet18.dispatch import (
     dispatch_train as dispatch_resnet18_train,
-)
-
-from project.task.cifar_zerofl.dispatch import (
-    dispatch_config as dispatch_cifar_zeroFL_config,
-)
-
-# Cifar FLASH
-from project.task.cifar_flash.dispatch import (
-    dispatch_config as dispatch_cifar_flash_config,
 )
 
 
@@ -168,15 +143,9 @@ def dispatch_config(cfg: DictConfig) -> ConfigStructure:
     """
     # Create the list of task dispatches to try
     task_config_functions: list[Callable[[DictConfig], ConfigStructure | None]] = [
-        dispatch_cifar_config,
         dispatch_default_config,
-        dispatch_cifar_powerprop_config,
-        dispatch_cifar_swat_config,
-        dispatch_cifar_power_swat_config,
         dispatch_resnet18_config,
-        dispatch_cifar_zeroFL_config,
         dispatch_speech_resnet18_config,
-        dispatch_cifar_flash_config,
     ]
 
     # Match the first function which does not return None
