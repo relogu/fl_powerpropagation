@@ -134,11 +134,7 @@ def train(  # pylint: disable=too-many-arguments
                 )
                 loss.backward()
                 optimizer.step()
-
-                # Clear gradients to save memory
-                # optimizer.zero_grad()  # ? not sure if this is needed
-    # torch.cuda.empty_cache()
-
+    torch.cuda.empty_cache()
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
             cast(Sized, trainloader.dataset)
@@ -234,11 +230,7 @@ def fixed_train(  # pylint: disable=too-many-arguments
                         param.grad *= m.to(config.device)
 
                 optimizer.step()
-
-                # Clear gradients to save memory
-                # optimizer.zero_grad()  # ? not sure if this is needed
-    # torch.cuda.empty_cache()
-
+    torch.cuda.empty_cache()
     return len(cast(Sized, trainloader.dataset)), {
         "train_loss": final_epoch_per_sample_loss / len(
             cast(Sized, trainloader.dataset)
@@ -248,7 +240,10 @@ def fixed_train(  # pylint: disable=too-many-arguments
 
 
 def get_train_and_prune(
-    alpha: float = 1.0, amount: float = 0.0, pruning_method: str = "l1"
+    alpha: float = 1.0,
+    amount: float = 0.0,
+    pruning_method: str = "l1",
+    sparsity_inc: float = 0.0,
 ) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
     """Return the training loop with one step pruning at the end.
 
@@ -278,18 +273,12 @@ def get_train_and_prune(
             _working_dir=_working_dir,
         )
 
-        # Used for ZeroFL
-        # sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
-        sparsity_inc = 0
-        # print(f"Amount: {amount}, Sparsity Inc: {sparsity_inc}")
-
         if amount > 0:
             """
             The net must be pruned:
             - at the first round if we are using powerprop
             - every round if we are not using powerprop (alpha=1.0)
             """
-            # torch.cuda.empty_cache()
             parameters_to_prune = get_parameters_to_prune(net)
 
             prune.global_unstructured(
@@ -303,17 +292,16 @@ def get_train_and_prune(
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
 
-            # Delete all residual variables and empty the cache
-            # del parameters_to_prune
-            torch.cuda.empty_cache()
-
         return metrics
 
     return train_and_prune
 
 
 def get_flash_train_and_prune(
-    alpha: float = 1.0, amount: float = 0.0, pruning_method: str = "l1"
+    alpha: float = 1.0,
+    amount: float = 0.0,
+    pruning_method: str = "l1",
+    sparsity_inc: float = 0.0,
 ) -> Callable[[nn.Module, DataLoader, dict, Path], tuple[int, dict]]:
     """Return the training loop with one step pruning at the end.
 
@@ -349,18 +337,12 @@ def get_flash_train_and_prune(
             _working_dir=_working_dir,
         )
 
-        # Used for ZeroFL
-        # sparsity_inc = sparsity_range * int(_config["cid"]) / num_scales
-        sparsity_inc = 0
-        # print(f"Amount: {amount}, Sparsity Inc: {sparsity_inc}")
-
         if amount > 0:
             """
             The net must be pruned:
             - at the first round if we are using powerprop
             - every round if we are not using powerprop (alpha=1.0)
             """
-            # torch.cuda.empty_cache()
             parameters_to_prune = get_parameters_to_prune(net)
 
             prune.global_unstructured(
@@ -373,28 +355,7 @@ def get_flash_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
-
-            # Delete all residual variables and empty the cache
-            # del parameters_to_prune
-            torch.cuda.empty_cache()
-
-        # WARMUP
-        # if _config["curr_round"] == 1 and _config["warmup"] > 0:
-        #     train_config: TrainConfig = TrainConfig(**_config)
-        #     # get the binary mask for the first round
-        #     mask = []
-        #     temp_net = deepcopy(before_train_net)
-        #     generic_set_parameters(temp_net, generic_get_parameters(net))
-        #     for param in temp_net.parameters():
-        #         # mask.append((param != 0))
-        #         mask.append((param != 0).float())
-        #     # apply the mask to the original parameter
-        #     with torch.no_grad():
-        #         for param, m in zip(before_train_net.parameters(), mask, strict=True):
-        #             param *= m.to(train_config.device)
-        #     # restore original (pruned) parameters
-        #     generic_set_parameters(net, generic_get_parameters(before_train_net))
-
+        torch.cuda.empty_cache()
         return metrics
 
     return train_and_prune
@@ -555,9 +516,7 @@ def get_fed_eval_fn(
             config.run_config,
             working_dir,
         )
-
         torch.cuda.empty_cache()
-
         return loss, metrics
 
     return fed_eval_fn

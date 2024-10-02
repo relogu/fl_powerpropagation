@@ -83,7 +83,7 @@ class NetCifarResnet18(nn.Module):
 
 
 def init_weights(module: nn.Module) -> None:
-    """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
+    """Initialise standard and custom layers in the input module."""
     if isinstance(
         module,
         nn.Linear | nn.Conv2d,

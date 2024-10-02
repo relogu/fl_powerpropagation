@@ -33,7 +33,10 @@ from project.task.default.train_test import (
     get_on_fit_config_fn as get_default_on_fit_config_fn,
 )
 
-from project.task.utils.powerprop_modules import PowerPropConv2D, PowerPropLinear
+from project.task.utils.sparsyfed_no_act_modules import (
+    SparsyFed_no_act_Conv2D,
+    SparsyFed_no_act_linear,
+)
 
 
 class TrainConfig(BaseModel):
@@ -93,7 +96,7 @@ def compute_average_exponent(model: nn.Module) -> float:
     for layer in model.modules():
         if isinstance(
             layer,
-            PowerPropLinear | PowerPropConv2D,
+            SparsyFed_no_act_linear | SparsyFed_no_act_Conv2D,
         ):
             weight = layer.weight.data
             weight = weight[weight != 0]  # Filter out zero weights

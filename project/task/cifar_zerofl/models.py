@@ -25,7 +25,7 @@ get_resnet: NetGen = lazy_config_wrapper(NetCifarResnet18)
 
 
 def init_weights(module: nn.Module) -> None:
-    """Initialise PowerPropLinear and PowerPropConv2D layers in the input module."""
+    """Initialise standard and custom layers in the input module."""
     if isinstance(
         module,
         SWATLinear | SWATConv2D | nn.Linear | nn.Conv2d,
@@ -144,8 +144,8 @@ def get_parameters_to_prune(
 ) -> Iterable[tuple[nn.Module, str, str]]:
     """Pruning.
 
-    Return an iterable of tuples containing the PowerPropConv2D layers in the input
-    model.
+    Return an iterable of tuples containing the SparsyFed_no_act_Conv2D layers in the
+    input model.
     """
     parameters_to_prune = []
     first_layer = _first_layer

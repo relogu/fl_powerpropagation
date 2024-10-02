@@ -36,20 +36,12 @@ def spectral_norm(
     weight_normalized = (
         weight_abs / sigma
     )  # Normalize the weight by the largest singular value
-    # weight_updated = weight * weight_normalized.view_as(self_weight)
-    # weight_updated = sign_weight * weight_normalized.view_as(self_weight)
 
-    # weight_updated = sign_weight * torch.pow(self_weight, 2 + weight_normalized.view_as(self_weight))
-    exponent = 1 + weight_normalized.view_as(self_weight)
-    exponent = torch.clamp(exponent, max=10)  # Clamp to prevent overflow
-
-    weight_updated = sign_weight * torch.pow(weight_abs, exponent)
-
-    return weight_updated
+    return self_weight * weight_normalized.view_as(self_weight)
 
 
-class PowerPropLinear(nn.Module):
-    """Powerpropagation Linear module."""
+class SparsyFed_no_act_linear(nn.Module):
+    """SparsyFed (no activation pruning) Linear module."""
 
     def __init__(
         self,
@@ -59,7 +51,7 @@ class PowerPropLinear(nn.Module):
         out_features: int,
         bias: bool = True,
     ):
-        super(PowerPropLinear, self).__init__()
+        super(SparsyFed_no_act_linear, self).__init__()
         self.alpha = alpha
         self.sparsity = sparsity
         self.in_features = in_features
@@ -70,7 +62,7 @@ class PowerPropLinear(nn.Module):
 
     def __repr__(self):
         return (
-            f"PowerPropLinear(alpha={self.alpha}, sparsity={self.sparsity},"
+            f"SparsyFed_no_act_linear(alpha={self.alpha}, sparsity={self.sparsity},"
             f" in_features={self.in_features},"
             f" out_features={self.out_features}, bias={self.b})"
         )
@@ -82,11 +74,9 @@ class PowerPropLinear(nn.Module):
         elif self.alpha < 0:
             return spectral_norm(weight)
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
-        # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
-        # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
         elif self.alpha < 0:
@@ -102,8 +92,8 @@ class PowerPropLinear(nn.Module):
         return F.linear(input=inputs, weight=weight, bias=self.bias)
 
 
-class PowerPropConv2D(nn.Module):
-    """Powerpropagation Conv2D module."""
+class SparsyFed_no_act_Conv2D(nn.Module):
+    """SparsyFed (no activation pruning) Conv2D module."""
 
     def __init__(
         self,
@@ -118,7 +108,7 @@ class PowerPropConv2D(nn.Module):
         groups: _int = 1,
         bias: bool = False,
     ):
-        super(PowerPropConv2D, self).__init__()
+        super(SparsyFed_no_act_Conv2D, self).__init__()
         self.alpha = alpha
         self.sparsity = sparsity
         self.in_channels = in_channels
@@ -136,7 +126,7 @@ class PowerPropConv2D(nn.Module):
 
     def __repr__(self):
         return (
-            f"PowerPropConv2D(alpha={self.alpha}, sparsity={self.sparsity},"
+            f"SparsyFed_no_act_Conv2D(alpha={self.alpha}, sparsity={self.sparsity},"
             f" in_channels={self.in_channels},"
             f" out_channels={self.out_channels}, kernel_size={self.kernel_size},"
             f" bias={self.b}, stride={self.stride}, padding={self.padding},"
@@ -150,11 +140,9 @@ class PowerPropConv2D(nn.Module):
         elif self.alpha < 0:
             return spectral_norm(weights)
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
-        # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
-        # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
         elif self.alpha < 0:
@@ -178,8 +166,8 @@ class PowerPropConv2D(nn.Module):
         )
 
 
-class PowerPropConv1D(nn.Module):
-    """Powerpropagation Conv1D module."""
+class SparsyFed_no_act_Conv1D(nn.Module):
+    """SparsyFed (no activation pruning) Conv1D module."""
 
     def __init__(
         self,
@@ -194,7 +182,7 @@ class PowerPropConv1D(nn.Module):
         groups: _int = 1,
         bias: bool = False,
     ):
-        super(PowerPropConv1D, self).__init__()
+        super(SparsyFed_no_act_Conv1D, self).__init__()
         self.alpha = alpha
         self.sparsity = sparsity
         self.in_channels = in_channels
@@ -210,7 +198,7 @@ class PowerPropConv1D(nn.Module):
 
     def __repr__(self):
         return (
-            f"PowerPropConv1D(alpha={self.alpha}, sparsity={self.sparsity},"
+            f"SparsyFed_no_act_Conv1D(alpha={self.alpha}, sparsity={self.sparsity},"
             f" in_channels={self.in_channels},"
             f" out_channels={self.out_channels}, kernel_size={self.kernel_size},"
             f" bias={self.b}, stride={self.stride}, padding={self.padding},"
@@ -222,11 +210,9 @@ class PowerPropConv1D(nn.Module):
         if self.alpha == 1.0:
             return weights
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
-        # return self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
 
     def forward(self, inputs, mask=None):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
-        # weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
         if self.alpha == 1.0:
             weight = self.weight
         else:

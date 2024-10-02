@@ -34,8 +34,6 @@ from project.task.utils.drop import (
 
 torch.autograd.set_detect_anomaly(True)
 
-top_k_threshold = 0.01
-
 
 def spectral_norm(
     self_weight: torch.Tensor, num_iterations: int = 1, epsilon: float = 1e-12
@@ -61,17 +59,6 @@ def spectral_norm(
     )  # Normalize the weight by the largest singular value
 
     return self_weight * weight_normalized.view_as(self_weight)
-
-    # weight_updated = weight * weight_normalized.view_as(self_weight)
-    # weight_updated = sign_weight * weight_normalized.view_as(self_weight)
-
-    # weight_updated = sign_weight * torch.pow(self_weight, 2 + weight_normalized.view_as(self_weight))
-    exponent = 1 + weight_normalized.view_as(self_weight)
-    exponent = torch.clamp(exponent, max=10)  # Clamp to prevent overflow
-
-    weight_updated = sign_weight * torch.pow(weight_abs, exponent)
-
-    return weight_updated
 
 
 def convolution_backward(
@@ -132,7 +119,7 @@ def convolution_backward(
     )
 
 
-class swat_linear(Function):
+class sparsyfed_linear(Function):
     @staticmethod
     def forward(ctx, input, weight, bias, sparsity):
 
@@ -145,11 +132,6 @@ class swat_linear(Function):
                 output += bias
 
         topk = 1 - sparsity
-        if (
-            topk < top_k_threshold
-        ):  # necassary since too small values create problem to drop !?
-            topk = top_k_threshold
-        # Must be decided a new treshold
 
         sparse_input = matrix_drop(input, topk)
 
@@ -172,7 +154,7 @@ class swat_linear(Function):
         return grad_input, grad_weight, grad_bias, None
 
 
-class SWATLinear(nn.Module):
+class SparsyFedLinear(nn.Module):
     """Powerpropagation Linear module."""
 
     def __init__(
@@ -183,7 +165,7 @@ class SWATLinear(nn.Module):
         bias: bool = True,
         sparsity: float = 0.3,
     ):
-        super(SWATLinear, self).__init__()
+        super(SparsyFedLinear, self).__init__()
         self.alpha = alpha
         self.in_features = in_features
         self.out_features = out_features
@@ -194,7 +176,7 @@ class SWATLinear(nn.Module):
 
     def __repr__(self):
         return (
-            f"SWATLinear(alpha={self.alpha}, in_features={self.in_features},"
+            f"SparsyFedLinear(alpha={self.alpha}, in_features={self.in_features},"
             f" out_features={self.out_features}, bias={self.b},"
             f" sparsity={self.sparsity})"
         )
@@ -207,34 +189,32 @@ class SWATLinear(nn.Module):
             return spectral_norm(weights)
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
 
-    def _call_swat_linear(self, input, weight) -> torch.Tensor:
+    def _call_sparsyfed_linear(self, input, weight) -> torch.Tensor:
         if self.training:
             sparsity = get_tensor_sparsity(weight)
         else:
             # Avoid to sparsify during the evaluation
             sparsity = 0.0
-        return swat_linear.apply(input, weight, self.bias, sparsity)
+        return sparsyfed_linear.apply(input, weight, self.bias, sparsity)
 
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha == 1.0:
-            powerprop_weight = self.weight
+            sparsyfed_weight = self.weight
         elif self.alpha < 0:
-            powerprop_weight = spectral_norm(self.weight)
+            sparsyfed_weight = spectral_norm(self.weight)
         else:
-            # powerprop_weight = self.weight * torch.pow(torch.abs(self.weight), self.alpha - 1.0)
-            powerprop_weight = torch.sign(self.weight) * torch.pow(
+            sparsyfed_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )
 
-        # Perform SWAT forward pass
-        output = self._call_swat_linear(input, powerprop_weight)
+        output = self._call_sparsyfed_linear(input, sparsyfed_weight)
 
         # Return the output
         return output
 
 
-class swat_conv2d(Function):
+class sparsyfed_conv2d(Function):
     @staticmethod
     def forward(
         ctx,
@@ -250,9 +230,6 @@ class swat_conv2d(Function):
     ):
         # Ensure input tensor is contiguous
         input = input.contiguous()
-        # weight = weight.contiguous()
-        # if bias is not None:
-        #     bias = bias.contiguous()
 
         output = F.conv2d(
             input=input,
@@ -264,19 +241,7 @@ class swat_conv2d(Function):
             groups=groups,
         )
 
-        # the output is not sparsified, it make sense?
-
-        # Sparsifying activations
-        # /SWAT-code/cifar10-100-code/custom_layers/custom_conv.py, sparsify_activations
-        # The threshold is computed in the forward pass, only the first time
-        # In the original paper is calcolated aftear a warmup period every tot epochs
-        # if self.epoch >= self.warmup:
-        #     if self.batch_idx % self.period == 0:
-
         topk = 1 - sparsity
-        # necassary since too small values create problem to drop !???
-        if topk < top_k_threshold:
-            topk = top_k_threshold
 
         sparse_input = matrix_drop(input, topk)
         if in_threshold < 0.0:
@@ -305,7 +270,7 @@ class swat_conv2d(Function):
         return convolution_backward(ctx, grad_output)
 
 
-class SWATConv2D(nn.Module):
+class SparsyFedConv2D(nn.Module):
     """Powerpropagation Conv2D module."""
 
     def __init__(
@@ -324,7 +289,7 @@ class SWATConv2D(nn.Module):
         warm_up: int = 0,
         period: int = 1,
     ):
-        super(SWATConv2D, self).__init__()
+        super(SparsyFedConv2D, self).__init__()
         self.alpha = alpha
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -349,7 +314,7 @@ class SWATConv2D(nn.Module):
 
     def __repr__(self):
         return (
-            f"SWATConv2D(alpha={self.alpha}, in_channels={self.in_channels},"
+            f"SparsyFedConv2D(alpha={self.alpha}, in_channels={self.in_channels},"
             f" out_channels={self.out_channels}, kernel_size={self.kernel_size},"
             f" bias={self.b}, stride={self.stride}, padding={self.padding},"
             f" dilation={self.dilation}, groups={self.groups},"
@@ -365,7 +330,7 @@ class SWATConv2D(nn.Module):
             return spectral_norm(weight)
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
 
-    def _call_swat_conv2d(self, input, weight) -> torch.Tensor:
+    def _call_sparsyfed_conv2d(self, input, weight) -> torch.Tensor:
 
         if self.training:
             # for the activation the sparsity used is proportional to the weight sparsity
@@ -374,7 +339,7 @@ class SWATConv2D(nn.Module):
             # Avoid to sparsify during the evaluation
             sparsity = 0.0
 
-        output, in_threshold = swat_conv2d.apply(
+        output, in_threshold = sparsyfed_conv2d.apply(
             input,
             weight,
             self.bias,
@@ -396,21 +361,18 @@ class SWATConv2D(nn.Module):
     def forward(self, input):
         # Apply the re-parametrisation to `self.weight` using `self.alpha`
         if self.alpha == 1.0:
-            powerprop_weight = self.weight
+            sparsyfed_weight = self.weight
         elif self.alpha < 0:
-            powerprop_weight = spectral_norm(self.weight)
+            sparsyfed_weight = spectral_norm(self.weight)
         else:
-            powerprop_weight = torch.sign(self.weight) * torch.pow(
+            sparsyfed_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
             )
-            # powerprop_weight = self.weight * torch.pow(
-            #     self.weight.abs(), self.alpha - 1
-            # )
 
         # Perform the forward pass
-        output = self._call_swat_conv2d(
+        output = self._call_sparsyfed_conv2d(
             input,
-            powerprop_weight,
+            sparsyfed_weight,
         )
 
         # Return the output

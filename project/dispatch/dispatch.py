@@ -12,16 +12,6 @@ from project.task.default.dispatch import dispatch_config as dispatch_default_co
 from project.task.default.dispatch import dispatch_data as dispatch_default_data
 from project.task.default.dispatch import dispatch_train as dispatch_default_train
 
-from project.task.mnist_classification.dispatch import (
-    dispatch_config as dispatch_mnist_config,
-)
-from project.task.mnist_classification.dispatch import (
-    dispatch_data as dispatch_mnist_data,
-)
-from project.task.mnist_classification.dispatch import (
-    dispatch_train as dispatch_mnist_train,
-)
-
 from project.task.cifar.dispatch import (
     dispatch_config as dispatch_cifar_config,
 )
@@ -129,7 +119,6 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
     # Create the list of task dispatches to try
     task_train_functions: list[Callable[[DictConfig], TrainStructure | None]] = [
         dispatch_default_train,
-        dispatch_mnist_train,
         dispatch_cifar_train,
         dispatch_cifar_swat_train,
         dispatch_cifar_power_swat_train,
@@ -173,7 +162,6 @@ def dispatch_data(cfg: DictConfig) -> DataStructure:
     task_data_dependent_functions: list[
         Callable[[DictConfig], DataStructure | None]
     ] = [
-        dispatch_mnist_data,
         dispatch_default_data,
         dispatch_cifar_data,
         dispatch_cifar_powerprop_data,
@@ -218,7 +206,6 @@ def dispatch_config(cfg: DictConfig) -> ConfigStructure:
     """
     # Create the list of task dispatches to try
     task_config_functions: list[Callable[[DictConfig], ConfigStructure | None]] = [
-        dispatch_mnist_config,
         dispatch_cifar_config,
         dispatch_default_config,
         dispatch_cifar_powerprop_config,

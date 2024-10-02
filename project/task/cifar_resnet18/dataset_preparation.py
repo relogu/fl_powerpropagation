@@ -10,11 +10,10 @@ import numpy as np
 import torch
 from flwr.common.logger import log
 from omegaconf import DictConfig, OmegaConf
-from torch.utils.data import ConcatDataset, Subset, random_split, DataLoader
+from torch.utils.data import ConcatDataset, Subset, random_split
 from torchvision import transforms
 from torchvision.datasets import CIFAR10, CIFAR100
 
-from project.utils.utils import obtain_device
 from project.task.utils.common import (
     XYList,
     create_lda_partitions,
@@ -520,56 +519,6 @@ def download_and_preprocess(cfg: DictConfig) -> None:
             # Save the subset tensors in a dictionary format
             subset_dict = {"data": ds_val_data, "targets": ds_val_targets}
             torch.save(subset_dict, client_dir / "test.pt")
-
-
-# TEST
-def test_client_dataloader(
-    partition_dir: Path,
-    cid: str | int,
-    batch_size: int,
-    test: bool,
-) -> DataLoader:
-    """Return a DataLoader for a client's dataset.
-
-    Parameters
-    ----------
-    cid : str|int
-        The client's ID
-    test : bool
-        Whether to load the test set or not
-    config : Dict
-        The configuration for the dataset
-
-    Returns
-    -------
-    DataLoader
-        The DataLoader for the client's dataset
-    """
-    client_dir = partition_dir / f"client_{cid}"
-    if not test:
-        dataset = torch.load(client_dir / "train.pt")
-    else:
-        dataset = torch.load(client_dir / "test.pt")
-
-    dataset = DataLoader(
-        list(zip(dataset["data"], dataset["targets"], strict=True)),
-        batch_size=batch_size,
-        shuffle=not test,
-    )
-
-    device = obtain_device()
-    # for data, target in list(zip(dataset['data'], dataset['targets'])):
-    # print(dataset['data'].shape)
-    for data, target in dataset:
-        data, target = (
-            data.to(
-                device,
-            ),
-            target.to(device),
-        )
-        break
-
-    return dataset
 
 
 if __name__ == "__main__":

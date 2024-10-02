@@ -9,14 +9,14 @@ import torch.nn.functional as F
 
 from torch import nn
 from torchvision.models import resnet18
-from project.task.utils.powerprop_modules import (
-    PowerPropConv1D,
-    PowerPropConv2D,
-    PowerPropLinear,
+from project.task.utils.sparsyfed_no_act_modules import (
+    SparsyFed_no_act_Conv1D,
+    SparsyFed_no_act_Conv2D,
+    SparsyFed_no_act_linear,
 )
 
-from project.task.utils.power_swat_modules import SWATConv2D as PowerSwatConv2D
-from project.task.utils.power_swat_modules import SWATLinear as PowerSwatLinear
+from project.task.utils.sparsyfed_modules import SparsyFedConv2D
+from project.task.utils.sparsyfed_modules import SparsyFedLinear
 
 from project.task.utils.swat_modules import SWATConv2D as ZeroflSwatConv2D
 from project.task.utils.swat_modules import SWATLinear as ZeroflSwatLinear
@@ -114,11 +114,11 @@ def init_weights(module: nn.Module) -> None:
     """Initialise custom layers in the input module."""
     if isinstance(
         module,
-        PowerPropLinear
-        | PowerPropConv2D
-        | PowerPropConv1D
-        | PowerSwatLinear
-        | PowerSwatConv2D
+        SparsyFed_no_act_linear
+        | SparsyFed_no_act_Conv2D
+        | SparsyFed_no_act_Conv1D
+        | SparsyFedLinear
+        | SparsyFedConv2D
         | ZeroflSwatLinear
         | ZeroflSwatConv2D
         | nn.Linear
@@ -133,11 +133,11 @@ def init_weights(module: nn.Module) -> None:
         if (
             isinstance(
                 module,
-                PowerPropLinear
-                | PowerPropConv2D
-                | PowerPropConv1D
-                | PowerSwatLinear
-                | PowerSwatConv2D
+                SparsyFed_no_act_linear
+                | SparsyFed_no_act_Conv2D
+                | SparsyFed_no_act_Conv1D
+                | SparsyFedLinear
+                | SparsyFedConv2D
                 | ZeroflSwatLinear
                 | ZeroflSwatConv2D,
             )
@@ -162,7 +162,7 @@ def replace_layer_with_powerprop(
     for attr_str in dir(module):
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:
-            new_conv = PowerPropConv2D(
+            new_conv = SparsyFed_no_act_Conv2D(
                 alpha=alpha,
                 sparsity=sparsity,
                 in_channels=target_attr.in_channels,
@@ -174,7 +174,7 @@ def replace_layer_with_powerprop(
             )
             setattr(module, attr_str, new_conv)
         if type(target_attr) == nn.Conv1d:
-            new_conv = PowerPropConv1D(
+            new_conv = SparsyFed_no_act_Conv1D(
                 alpha=alpha,
                 sparsity=sparsity,
                 in_channels=target_attr.in_channels,
@@ -186,7 +186,7 @@ def replace_layer_with_powerprop(
             )
             setattr(module, attr_str, new_conv)
         if type(target_attr) == nn.Linear:
-            new_conv = PowerPropLinear(
+            new_conv = SparsyFed_no_act_linear(
                 alpha=alpha,
                 sparsity=sparsity,
                 in_features=target_attr.in_features,
@@ -268,7 +268,7 @@ def replace_layer_with_power_swat(
     for attr_str in dir(module):
         target_attr = getattr(module, attr_str)
         if type(target_attr) == nn.Conv2d:
-            new_conv = PowerSwatConv2D(
+            new_conv = SparsyFedConv2D(
                 alpha=alpha,
                 in_channels=target_attr.in_channels,
                 out_channels=target_attr.out_channels,
@@ -283,7 +283,7 @@ def replace_layer_with_power_swat(
             )
             setattr(module, attr_str, new_conv)
         if type(target_attr) == nn.Linear:
-            new_conv = PowerSwatLinear(
+            new_conv = SparsyFedLinear(
                 alpha=alpha,
                 in_features=target_attr.in_features,
                 out_features=target_attr.out_features,
@@ -442,8 +442,8 @@ def get_parameters_to_prune(
 ) -> Iterable[tuple[nn.Module, str, str]]:
     """Pruning.
 
-    Return an iterable of tuples containing the PowerPropConv2D and PowerPropConv1D
-    layers in the input model.
+    Return an iterable of tuples containing the SparsyFed_no_act_Conv2D and
+    SparsyFed_no_act_Conv1D layers in the input model.
     """
     parameters_to_prune = []
     first_layer = _first_layer
@@ -454,11 +454,11 @@ def get_parameters_to_prune(
     ) -> None:
         nonlocal first_layer
         if (
-            type(module) == PowerPropConv2D
-            or type(module) == PowerPropConv1D
-            or type(module) == PowerPropLinear
-            or type(module) == PowerSwatConv2D
-            or type(module) == PowerSwatLinear
+            type(module) == SparsyFed_no_act_Conv2D
+            or type(module) == SparsyFed_no_act_Conv1D
+            or type(module) == SparsyFed_no_act_linear
+            or type(module) == SparsyFedConv2D
+            or type(module) == SparsyFedLinear
             or type(module) == ZeroflSwatConv2D
             or type(module) == ZeroflSwatLinear
             or type(module) == nn.Conv2d
