@@ -273,42 +273,62 @@ class FedAvgFLASH(Strategy):
 
         if server_round == 1:
             # Extract target sparsity from the first result's metrics
-            target_sparsity = results[0][1].metrics["sparsity"]
-            target_density = 1 - int(target_sparsity)
+            target_sparsity = float(results[0][1].metrics["sparsity"])
 
-            # Step 1: Compute average density per layer
-            avg_densities = []
-            for layer_idx in range(len(weights_results[0][0])):
-                layer_densities = [
-                    compute_layer_density(client_weights[layer_idx])
-                    for client_weights, _ in weights_results
-                ]
-                avg_densities.append(np.mean(layer_densities))
+            def compute_layer_density(layer):
+                return np.count_nonzero(layer) / layer.size
+
+            # Step 1: Compute average density per layer from individual results
+            num_layers = len(weights_results[0][0])
+            avg_densities = [0] * num_layers
+            total_examples = sum(num_examples for _, num_examples in weights_results)
+
+            for weights, num_examples in weights_results:
+                for i, layer in enumerate(weights):
+                    avg_densities[i] += compute_layer_density(layer) * (
+                        num_examples / total_examples
+                    )
 
             # Step 2: Aggregate the values
             aggregated_updates = aggregate(weights_results)
 
-            # Step 3: Compute sparsity reached
-            total_params = sum(layer.size for layer in aggregated_updates)
-            nonzero_params = sum(
-                int(layer.size * density)
-                for layer, density in zip(aggregated_updates, avg_densities)
-            )
-            reached_density = nonzero_params / total_params
+            # Step 3: Apply layer-specific sparsification
+            pruned_parameters = []
+            for layer, density in zip(aggregated_updates, avg_densities):
+                sparsity = 1 - density
+                k = int(layer.size * density)
+                if k < layer.size:
+                    threshold = np.partition(np.abs(layer).flatten(), -k)[-k]
+                    pruned_parameters.append(layer * (np.abs(layer) >= threshold))
+                else:
+                    pruned_parameters.append(layer)
 
-            # Step 4: Calculate adjustment
-            adjustment_factor = target_density / reached_density
+            # Step 4: Calculate current global sparsity
+            total_params = sum(layer.size for layer in pruned_parameters)
+            total_nonzero = sum(np.count_nonzero(layer) for layer in pruned_parameters)
+            current_sparsity = 1 - (total_nonzero / total_params)
 
-            # Step 5: Apply adjustment to average density to obtain sensitivity
-            sensitivities = [
-                min(1.0, density * adjustment_factor) for density in avg_densities
-            ]
+            # Step 5: Adjust to target sparsity if necessary
+            if (
+                abs(current_sparsity - target_sparsity) > 1e-6
+            ):  # Allow for small floating-point differences
+                all_values = np.concatenate([
+                    np.abs(layer).flatten() for layer in pruned_parameters
+                ])
+                k = int(total_params * (1 - target_sparsity))
+                threshold = np.partition(all_values, -k)[-k]
+                pruned_parameters = [
+                    layer * (np.abs(layer) >= threshold) for layer in pruned_parameters
+                ]
 
-            # Step 6: Prune the aggregated value with the sensitivity
-            pruned_parameters = [
-                topk_sparsify(layer, sensitivity)
-                for layer, sensitivity in zip(aggregated_updates, sensitivities)
-            ]
+            # Verify final global sparsity
+            final_nonzero = sum(np.count_nonzero(layer) for layer in pruned_parameters)
+            final_density = final_nonzero / total_params
+            final_sparsity = 1 - final_density
+
+            print(f"Target sparsity: {target_sparsity:.4f}")
+            print(f"Layer-wise sparsity: {current_sparsity:.4f}")
+            print(f"Achieved global sparsity: {final_sparsity:.4f}")
 
             parameters_aggregated = ndarrays_to_parameters(pruned_parameters)
         else:

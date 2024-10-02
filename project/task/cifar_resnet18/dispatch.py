@@ -23,8 +23,19 @@ from omegaconf import DictConfig
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar_resnet18.dataset import get_dataloader_generators
-from project.task.cifar_resnet18.models import get_resnet18
-from project.task.cifar_resnet18.train_test import get_fed_eval_fn, train, test
+from project.task.cifar_resnet18.models import (
+    get_network_generator_resnet_sparsyfed,
+    get_network_generator_resnet_sparsyfed_no_act,
+    get_network_generator_resnet_zerofl,
+    get_resnet18,
+)
+from project.task.cifar_resnet18.train_test import (
+    get_fed_eval_fn,
+    get_fixed_train_and_prune,
+    get_train_and_prune,
+    train,
+    test,
+)
 from project.types.common import DataStructure, TrainStructure
 
 
@@ -57,11 +68,44 @@ def dispatch_train(
         "train_structure",
         None,
     )
+    alpha = cfg.get("task", {}).get(
+        "alpha",
+        1.0,
+    )
+    sparsity = cfg.get("task", {}).get(
+        "sparsity",
+        0.0,
+    )
+    # ZeroFL: the sparsity must be modified to include the mask
+    mask = cfg.get("task", {}).get("mask", 0.0)
+    sparsity = sparsity - mask
 
     # Only consider not None and uppercase matches
-    if train_structure is not None and train_structure.upper() == "RESNET18":
+    if train_structure is not None and train_structure.upper() == "CIFAR_RESNET18":
         return (
             train,
+            test,
+            get_fed_eval_fn,
+        )
+    if (
+        train_structure is not None
+        and train_structure.upper() == "CIFAR_RESNET18_PRUNE"
+    ):
+        return (
+            # train,
+            get_train_and_prune(alpha=alpha, amount=sparsity, pruning_method="l1"),
+            test,
+            get_fed_eval_fn,
+        )
+    if (
+        train_structure is not None
+        and train_structure.upper() == "CIFAR_RESNET18_FIXED_PRUNE"
+    ):
+        return (
+            # train,
+            get_fixed_train_and_prune(
+                alpha=alpha, amount=sparsity, pruning_method="l1"
+            ),
             test,
             get_fed_eval_fn,
         )
@@ -118,13 +162,49 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         ) = get_dataloader_generators(
             Path(partition_dir),
         )
+        alpha: float = cfg.get("task", {}).get("alpha", 1.0)
+        sparsity: float = cfg.get("task", {}).get("sparsity", 0.0)
+        num_classes: int = cfg.get("dataset", {}).get(
+            "num_classes",
+            10,
+        )
 
         # Case insensitive matches
         if client_model_and_data.upper() == "CIFAR_RESNET18":
-            num_classes: int = cfg.get("dataset", {}).get(
-                "num_classes",
-                10,
+            return (
+                get_resnet18(num_classes=num_classes),
+                client_dataloader_gen,
+                fed_dataloader_gen,
             )
+        # SparseFed
+        if client_model_and_data.upper() == "CIFAR_SPARSYFED_RESNET18":
+            return (
+                get_network_generator_resnet_sparsyfed(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
+                client_dataloader_gen,
+                fed_dataloader_gen,
+            )
+        # SparseFed with no activation
+        if client_model_and_data.upper() == "CIFAR_SPARSYFED_NO_ACT_RESNET18":
+            return (
+                get_network_generator_resnet_sparsyfed_no_act(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
+                client_dataloader_gen,
+                fed_dataloader_gen,
+            )
+        # ZeroFL
+        if client_model_and_data.upper() == "CIFAR_ZEROFL_RESNET18":
+            return (
+                get_network_generator_resnet_zerofl(
+                    alpha=alpha, sparsity=sparsity, num_classes=num_classes
+                ),
+                client_dataloader_gen,
+                fed_dataloader_gen,
+            )
+        # FLASH
+        if client_model_and_data.upper() == "CIFAR_FLASH_RESNET18":
             return (
                 get_resnet18(num_classes=num_classes),
                 client_dataloader_gen,

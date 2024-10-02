@@ -50,7 +50,7 @@ def init_weights(module: nn.Module) -> None:
             module.bias.data.zero_()
 
 
-def replace_layer_with_powerprop(
+def replace_layer_with_sparsyfed_no_act(
     module: nn.Module,
     name: str = "Model",  # ? Never used. Give some problem
     alpha: float = 1.0,
@@ -83,10 +83,12 @@ def replace_layer_with_powerprop(
 
     # ? for name, immediate_child_module in module.named_children(): # Previus version
     for model, immediate_child_module in module.named_children():
-        replace_layer_with_powerprop(immediate_child_module, model, alpha, sparsity)
+        replace_layer_with_sparsyfed_no_act(
+            immediate_child_module, model, alpha, sparsity
+        )
 
 
-def get_network_generator_resnet_powerprop(
+def get_network_generator_resnet_sparsyfed_no_act(
     alpha: float = 1.0,
     sparsity: float = 0.0,
     num_classes: int = 10,
@@ -94,7 +96,7 @@ def get_network_generator_resnet_powerprop(
     """Powerprop Resnet generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
 
-    replace_layer_with_powerprop(
+    replace_layer_with_sparsyfed_no_act(
         module=untrained_net,
         name="NetCifarResnet18",
         alpha=alpha,

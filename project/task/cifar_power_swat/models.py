@@ -50,7 +50,7 @@ def init_weights(module: nn.Module) -> None:
             module.bias.data.zero_()
 
 
-def replace_layer_with_swat(
+def replace_layer_with_sparsyfed(
     module: nn.Module,
     name: str = "Model",
     alpha: float = 1.0,
@@ -86,10 +86,10 @@ def replace_layer_with_swat(
             setattr(module, attr_str, new_conv)
 
     for model, immediate_child_module in module.named_children():
-        replace_layer_with_swat(immediate_child_module, model, alpha, sparsity)
+        replace_layer_with_sparsyfed(immediate_child_module, model, alpha, sparsity)
 
 
-def get_network_generator_resnet_swat(
+def get_network_generator_resnet_sparsyfed(
     alpha: float = 1.0,
     sparsity: float = 0.0,
     num_classes: int = 10,
@@ -98,7 +98,7 @@ def get_network_generator_resnet_swat(
     """Swat network generator."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
 
-    replace_layer_with_swat(
+    replace_layer_with_sparsyfed(
         module=untrained_net,
         name="NetCifarResnet18",
         alpha=alpha,

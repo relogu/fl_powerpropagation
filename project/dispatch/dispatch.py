@@ -9,47 +9,21 @@ from collections.abc import Callable
 from omegaconf import DictConfig
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
-from project.task.default.dispatch import dispatch_data as dispatch_default_data
-from project.task.default.dispatch import dispatch_train as dispatch_default_train
 
 from project.task.cifar.dispatch import (
     dispatch_config as dispatch_cifar_config,
-)
-from project.task.cifar.dispatch import (
-    dispatch_data as dispatch_cifar_data,
-)
-from project.task.cifar.dispatch import (
-    dispatch_train as dispatch_cifar_train,
 )
 
 from project.task.cifar_powerprop.dispatch import (
     dispatch_config as dispatch_cifar_powerprop_config,
 )
-from project.task.cifar_powerprop.dispatch import (
-    dispatch_data as dispatch_cifar_powerprop_data,
-)
-from project.task.cifar_powerprop.dispatch import (
-    dispatch_train as dispatch_cifar_powerprop_train,
-)
 
 from project.task.cifar_swat.dispatch import (
     dispatch_config as dispatch_cifar_swat_config,
 )
-from project.task.cifar_swat.dispatch import (
-    dispatch_data as dispatch_cifar_swat_data,
-)
-from project.task.cifar_swat.dispatch import (
-    dispatch_train as dispatch_cifar_swat_train,
-)
 
 from project.task.cifar_power_swat.dispatch import (
     dispatch_config as dispatch_cifar_power_swat_config,
-)
-from project.task.cifar_power_swat.dispatch import (
-    dispatch_data as dispatch_cifar_power_swat_data,
-)
-from project.task.cifar_power_swat.dispatch import (
-    dispatch_train as dispatch_cifar_power_swat_train,
 )
 
 
@@ -64,22 +38,10 @@ from project.task.cifar_resnet18.dispatch import (
 from project.task.cifar_zerofl.dispatch import (
     dispatch_config as dispatch_cifar_zeroFL_config,
 )
-from project.task.cifar_zerofl.dispatch import (
-    dispatch_data as dispatch_cifar_zeroFL_data,
-)
-from project.task.cifar_zerofl.dispatch import (
-    dispatch_train as dispatch_cifar_zeroFL_train,
-)
 
 # Cifar FLASH
 from project.task.cifar_flash.dispatch import (
     dispatch_config as dispatch_cifar_flash_config,
-)
-from project.task.cifar_flash.dispatch import (
-    dispatch_data as dispatch_cifar_flash_data,
-)
-from project.task.cifar_flash.dispatch import (
-    dispatch_train as dispatch_cifar_flash_train,
 )
 
 
@@ -118,15 +80,15 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
     """
     # Create the list of task dispatches to try
     task_train_functions: list[Callable[[DictConfig], TrainStructure | None]] = [
-        dispatch_default_train,
-        dispatch_cifar_train,
-        dispatch_cifar_swat_train,
-        dispatch_cifar_power_swat_train,
-        dispatch_cifar_powerprop_train,
+        # dispatch_default_train,
+        # dispatch_cifar_train,
+        # dispatch_cifar_swat_train,
+        # dispatch_cifar_power_swat_train,
+        # dispatch_cifar_powerprop_train,
+        # dispatch_cifar_zeroFL_train,
+        # dispatch_cifar_flash_train,
         dispatch_resnet18_train,
-        dispatch_cifar_zeroFL_train,
         dispatch_speech_resnet18_train,
-        dispatch_cifar_flash_train,
     ]
 
     # Match the first function which does not return None
@@ -162,15 +124,15 @@ def dispatch_data(cfg: DictConfig) -> DataStructure:
     task_data_dependent_functions: list[
         Callable[[DictConfig], DataStructure | None]
     ] = [
-        dispatch_default_data,
-        dispatch_cifar_data,
-        dispatch_cifar_powerprop_data,
-        dispatch_cifar_swat_data,
-        dispatch_cifar_power_swat_data,
+        # dispatch_default_data,
+        # dispatch_cifar_data,
+        # dispatch_cifar_powerprop_data,
+        # dispatch_cifar_swat_data,
+        # dispatch_cifar_power_swat_data,
+        # dispatch_cifar_zeroFL_data,
+        # dispatch_cifar_flash_data,
         dispatch_resnet18_data,
-        dispatch_cifar_zeroFL_data,
         dispatch_speech_resnet18_data,
-        dispatch_cifar_flash_data,
     ]
 
     # Match the first function which does not return None

@@ -272,7 +272,9 @@ def get_network_generator_resnet() -> Callable[[], NetCifarResnet18]:
     return generated_net
 
 
-def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet18]:
+def get_network_generator_resnet_sparsyfed_no_act() -> (
+    Callable[[dict], NetCifarResnet18]
+):
     """Powerprop Resnet generator."""
     alpha: float = 4.0
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=10)
@@ -297,7 +299,7 @@ def get_network_generator_resnet_powerprop() -> Callable[[dict], NetCifarResnet1
     return generated_net
 
 
-def get_network_generator_resnet_swat() -> Callable[[dict], NetCifarResnet18]:
+def get_network_generator_resnet_zerofl() -> Callable[[dict], NetCifarResnet18]:
     """Swat network generator."""
     alpha: float = 2
     sparsity: float = 0.7

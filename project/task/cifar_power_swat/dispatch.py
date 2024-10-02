@@ -22,7 +22,7 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_power_swat.models import get_network_generator_resnet_swat
+from project.task.cifar_power_swat.models import get_network_generator_resnet_sparsyfed
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar_power_swat.dataset import get_dataloader_generators
@@ -129,7 +129,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         # for the provided partition dir
         (
             client_dataloader_gen,
-            fed_dataloater_gen,
+            fed_dataloader_gen,
         ) = get_dataloader_generators(
             Path(partition_dir),
         )
@@ -143,11 +143,11 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 10,
             )
             return (
-                get_network_generator_resnet_swat(
+                get_network_generator_resnet_sparsyfed(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
                 ),
                 client_dataloader_gen,
-                fed_dataloater_gen,
+                fed_dataloader_gen,
             )
 
     # Cannot match, send to next dispatch in chain

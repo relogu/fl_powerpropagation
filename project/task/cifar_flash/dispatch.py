@@ -22,7 +22,9 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_flash.models import get_network_generator_resnet_powerprop
+from project.task.cifar_flash.models import (
+    get_network_generator_resnet_sparsyfed_no_act,
+)
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar_flash.dataset import (
@@ -137,7 +139,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 Path(partition_dir),
             )
             return (
-                get_network_generator_resnet_powerprop(
+                get_network_generator_resnet_sparsyfed_no_act(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
                 ),
                 client_dataloader_gen,

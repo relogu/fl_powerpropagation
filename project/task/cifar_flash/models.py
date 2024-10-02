@@ -86,7 +86,7 @@ def replace_layer_with_powerprop(
         replace_layer_with_powerprop(immediate_child_module, model, alpha, sparsity)
 
 
-def get_network_generator_resnet_powerprop(
+def get_network_generator_resnet_sparsyfed_no_act(
     alpha: float = 1.0,
     sparsity: float = 0.0,
     num_classes: int = 10,

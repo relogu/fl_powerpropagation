@@ -1,7 +1,7 @@
 """Define our models, and training and eval functions."""
 
 from copy import deepcopy
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 import numpy as np
 
 import torch
@@ -9,6 +9,16 @@ import torch.nn.functional as F
 
 from torch import nn
 from torchvision.models import resnet18
+
+from project.task.utils.sparsyfed_modules import SparsyFedConv2D, SparsyFedLinear
+from project.task.utils.sparsyfed_no_act_modules import (
+    SparsyFed_no_act_Conv1D,
+    SparsyFed_no_act_Conv2D,
+    SparsyFed_no_act_linear,
+)
+
+from project.task.utils.swat_modules import SWATConv2D as ZeroflSwatConv2D
+from project.task.utils.swat_modules import SWATLinear as ZeroflSwatLinear
 
 
 class Net(nn.Module):
@@ -86,9 +96,17 @@ def init_weights(module: nn.Module) -> None:
     """Initialise standard and custom layers in the input module."""
     if isinstance(
         module,
-        nn.Linear | nn.Conv2d,
+        SparsyFed_no_act_linear
+        | SparsyFed_no_act_Conv2D
+        | SparsyFed_no_act_Conv1D
+        | SparsyFedLinear
+        | SparsyFedConv2D
+        | ZeroflSwatLinear
+        | ZeroflSwatConv2D
+        | nn.Linear
+        | nn.Conv2d
+        | nn.Conv1d,
     ):
-        # print(f"init_weights: {type(module)}")
         # Your code here
         fan_in = calculate_fan_in(module.weight.data)
 
@@ -99,25 +117,21 @@ def init_weights(module: nn.Module) -> None:
         a, b = -2.0 * std, 2.0 * std
 
         u = nn.init.trunc_normal_(module.weight.data, std=std, a=a, b=b)
+        if (
+            isinstance(
+                module,
+                SparsyFed_no_act_linear
+                | SparsyFed_no_act_Conv2D
+                | SparsyFedLinear
+                | SparsyFedConv2D,
+            )
+            and module.alpha > 1
+        ):
+            u = torch.sign(u) * torch.pow(torch.abs(u), 1.0 / module.alpha)
 
         module.weight.data = u
         if module.bias is not None:
             module.bias.data.zero_()
-
-
-def new_init_weights(module: nn.Module) -> None:
-    """Initialize weights for linear and convolutional layers."""
-    if isinstance(module, nn.Linear | nn.Conv2d):
-        fan_in = module.weight.data.size(1)
-        fan_out = module.weight.data.size(0)
-        if isinstance(module, nn.Conv2d):
-            receptive_field_size = np.prod(module.kernel_size) * module.in_channels
-            fan_out *= receptive_field_size
-
-        std = np.sqrt(2.0 / (fan_in + fan_out))  # Xavier initialization
-        nn.init.normal_(module.weight.data, 0, std)
-        if module.bias is not None:
-            nn.init.constant_(module.bias.data, 0)
 
 
 def calculate_fan_in(tensor: torch.Tensor) -> float:
@@ -142,6 +156,231 @@ def calculate_fan_in(tensor: torch.Tensor) -> float:
     return float(fan_in)
 
 
+def replace_layer_with_swat(
+    module: nn.Module,
+    name: str = "Model",
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    pruning_type: str = "unstructured",
+    first_layer: bool = True,
+) -> None:
+    """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
+    for attr_str in dir(module):
+        target_attr = getattr(module, attr_str)
+        if type(target_attr) == nn.Conv2d:
+            if first_layer:
+                first_layer = False
+                continue
+            new_conv = ZeroflSwatConv2D(
+                alpha=alpha,
+                in_channels=target_attr.in_channels,
+                out_channels=target_attr.out_channels,
+                kernel_size=target_attr.kernel_size[0],
+                bias=target_attr.bias is not None,
+                padding=target_attr.padding,
+                stride=target_attr.stride,
+                sparsity=sparsity,
+                pruning_type=pruning_type,
+                warm_up=0,
+                period=1,
+            )
+            setattr(module, attr_str, new_conv)
+        if type(target_attr) == nn.Linear:
+            if first_layer:
+                first_layer = False
+                continue
+            new_conv = ZeroflSwatLinear(
+                alpha=alpha,
+                in_features=target_attr.in_features,
+                out_features=target_attr.out_features,
+                bias=target_attr.bias is not None,
+                sparsity=sparsity,
+            )
+            setattr(module, attr_str, new_conv)
+
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_swat(
+            immediate_child_module, model, alpha, sparsity, first_layer=first_layer
+        )
+
+
+def get_network_generator_resnet_zerofl(
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 10,
+    pruning_type: str = "unstructured",
+) -> Callable[[dict], NetCifarResnet18]:
+    """Swat network generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
+
+    replace_layer_with_swat(
+        module=untrained_net,
+        name="NetCifarResnet18",
+        alpha=alpha,
+        sparsity=sparsity,
+        pruning_type=pruning_type,
+    )
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        """Initialize the weights of the layers."""
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
+
+    def generated_net(_config: dict | None) -> NetCifarResnet18:
+        """Return a deep copy of the untrained network."""
+        return deepcopy(untrained_net)
+
+    return generated_net
+
+
+def replace_layer_with_sparsyfed(
+    module: nn.Module,
+    name: str = "Model",
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    pruning_type: str = "unstructured",
+) -> None:
+    """Replace every nn.Conv2d and nn.Linear layers with the SWAT versions."""
+    for attr_str in dir(module):
+        target_attr = getattr(module, attr_str)
+        if type(target_attr) == nn.Conv2d:
+            new_conv = SparsyFedConv2D(
+                alpha=alpha,
+                in_channels=target_attr.in_channels,
+                out_channels=target_attr.out_channels,
+                kernel_size=target_attr.kernel_size[0],
+                bias=target_attr.bias is not None,
+                padding=target_attr.padding,
+                stride=target_attr.stride,
+                sparsity=sparsity,
+                pruning_type=pruning_type,
+                warm_up=0,
+                period=1,
+            )
+            setattr(module, attr_str, new_conv)
+        if type(target_attr) == nn.Linear:
+            new_conv = SparsyFedLinear(
+                alpha=alpha,
+                in_features=target_attr.in_features,
+                out_features=target_attr.out_features,
+                bias=target_attr.bias is not None,
+                sparsity=sparsity,
+            )
+            setattr(module, attr_str, new_conv)
+
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_sparsyfed(immediate_child_module, model, alpha, sparsity)
+
+
+def get_network_generator_resnet_sparsyfed(
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 10,
+    pruning_type: str = "unstructured",
+) -> Callable[[dict], NetCifarResnet18]:
+    """Swat network generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
+
+    replace_layer_with_sparsyfed(
+        module=untrained_net,
+        name="NetCifarResnet18",
+        alpha=alpha,
+        sparsity=sparsity,
+        pruning_type=pruning_type,
+    )
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        """Initialize the weights of the layers."""
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
+
+    def generated_net(_config: dict | None) -> NetCifarResnet18:
+        """Return a deep copy of the untrained network."""
+        return deepcopy(untrained_net)
+
+    return generated_net
+
+
+def replace_layer_with_sparsyfed_no_act(
+    module: nn.Module,
+    name: str = "Model",  # ? Never used. Give some problem
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+) -> None:
+    """Replace every nn.Conv2d and nn.Linear layers with the PowerProp versions."""
+    for attr_str in dir(module):
+        target_attr = getattr(module, attr_str)
+        if type(target_attr) == nn.Conv2d:
+            new_conv = SparsyFed_no_act_Conv2D(
+                alpha=alpha,
+                sparsity=sparsity,
+                in_channels=target_attr.in_channels,
+                out_channels=target_attr.out_channels,
+                kernel_size=target_attr.kernel_size[0],
+                bias=target_attr.bias is not None,
+                padding=target_attr.padding,
+                stride=target_attr.stride,
+            )
+            setattr(module, attr_str, new_conv)
+        if type(target_attr) == nn.Linear:
+            new_conv = SparsyFed_no_act_linear(
+                alpha=alpha,
+                sparsity=sparsity,
+                in_features=target_attr.in_features,
+                out_features=target_attr.out_features,
+                bias=target_attr.bias is not None,
+            )
+            setattr(module, attr_str, new_conv)
+
+    # ? for name, immediate_child_module in module.named_children(): # Previus version
+    for model, immediate_child_module in module.named_children():
+        replace_layer_with_sparsyfed_no_act(
+            immediate_child_module, model, alpha, sparsity
+        )
+
+
+def get_network_generator_resnet_sparsyfed_no_act(
+    alpha: float = 1.0,
+    sparsity: float = 0.0,
+    num_classes: int = 10,
+) -> Callable[[dict], NetCifarResnet18]:
+    """Powerprop Resnet generator."""
+    untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
+
+    replace_layer_with_sparsyfed_no_act(
+        module=untrained_net,
+        name="NetCifarResnet18",
+        alpha=alpha,
+        sparsity=sparsity,
+    )
+
+    def init_model(
+        module: nn.Module,
+    ) -> None:
+        """Initialize the weights of the layers."""
+        init_weights(module)
+        for _, immediate_child_module in module.named_children():
+            init_model(immediate_child_module)
+
+    init_model(untrained_net)
+
+    def generated_net(_config: dict) -> NetCifarResnet18:
+        """Return a deep copy of the untrained network."""
+        return deepcopy(untrained_net)
+
+    return generated_net
+
+
 def get_resnet18(num_classes: int = 10) -> Callable[[dict], NetCifarResnet18]:
     """Cifar Resnet18 network generatror."""
     untrained_net: NetCifarResnet18 = NetCifarResnet18(num_classes=num_classes)
@@ -162,3 +401,45 @@ def get_resnet18(num_classes: int = 10) -> Callable[[dict], NetCifarResnet18]:
     init_model(untrained_net)
 
     return generated_net
+
+
+def get_parameters_to_prune(
+    net: nn.Module,
+    _first_layer: bool = False,
+) -> Iterable[tuple[nn.Module, str, str]]:
+    """Pruning.
+
+    Return an iterable of tuples containing the SparsyFed_no_act_Conv2D and
+    SparsyFed_no_act_Conv1D layers in the input model.
+    """
+    parameters_to_prune = []
+    first_layer = _first_layer
+
+    def add_immediate_child(
+        module: nn.Module,
+        name: str,
+    ) -> None:
+        nonlocal first_layer
+        if (
+            type(module) == SparsyFed_no_act_Conv2D
+            or type(module) == SparsyFed_no_act_Conv1D
+            or type(module) == SparsyFed_no_act_linear
+            or type(module) == SparsyFedConv2D
+            or type(module) == SparsyFedLinear
+            or type(module) == ZeroflSwatConv2D
+            or type(module) == ZeroflSwatLinear
+            or type(module) == nn.Conv2d
+            or type(module) == nn.Conv1d
+            or type(module) == nn.Linear
+        ):
+            if first_layer:
+                first_layer = False
+            else:
+                parameters_to_prune.append((module, "weight", name))
+
+        for _name, immediate_child_module in module.named_children():
+            add_immediate_child(immediate_child_module, _name)
+
+    add_immediate_child(net, "Net")
+
+    return parameters_to_prune

@@ -24,8 +24,8 @@ from omegaconf import DictConfig
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar.dataset import get_dataloader_generators
 from project.task.cifar.models import (
-    get_network_generator_resnet_powerprop,
-    get_network_generator_resnet_swat,
+    get_network_generator_resnet_sparsyfed_no_act,
+    get_network_generator_resnet_zerofl,
 )
 from project.task.cifar.train_test import get_fed_eval_fn, get_train, test
 from project.task.cifar.train_test import (
@@ -137,13 +137,13 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
         # Case insensitive matches
         if client_model_and_data.upper() == "CIFAR_POWERPROP":
             return (
-                get_network_generator_resnet_powerprop(),
+                get_network_generator_resnet_sparsyfed_no_act(),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )
         elif client_model_and_data.upper() == "CIFAR_SWAT":
             return (
-                get_network_generator_resnet_swat(),
+                get_network_generator_resnet_zerofl(),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )

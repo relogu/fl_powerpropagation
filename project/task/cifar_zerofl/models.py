@@ -104,7 +104,7 @@ def replace_layer_with_swat(
         )
 
 
-def get_network_generator_resnet_swat(
+def get_network_generator_resnet_zerofl(
     alpha: float = 1.0,
     sparsity: float = 0.0,
     num_classes: int = 10,
@@ -188,8 +188,8 @@ def test_out() -> None:
     )
 
     # Create the SWAT ResNet model
-    swat_model = get_network_generator_resnet_swat()(fake_config)
-    # swat_model = get_network_generator_resnet_swat()(None)
+    swat_model = get_network_generator_resnet_zerofl()(fake_config)
+    # swat_model = get_network_generator_resnet_zerofl()(None)
     swat_model.load_state_dict(
         generate_random_state_dict(swat_model, seed=42, sparsity=0)
     )
@@ -216,7 +216,7 @@ def test_gradient() -> None:
     fake_config = dict([[], []])
 
     # Create the SWAT ResNet model
-    swat_model = get_network_generator_resnet_swat()(fake_config)
+    swat_model = get_network_generator_resnet_zerofl()(fake_config)
 
     # Pass the input tensor through the model
     output = swat_model(input_tensor)
@@ -254,8 +254,8 @@ def compare_gradients() -> None:
 
     # Create the SWAT ResNet model
     # print("[compare_gradients] Creating the SWAT ResNet model")
-    swat_model = get_network_generator_resnet_swat()(fake_config)
-    # swat_model = get_network_generator_resnet_swat()(None)
+    swat_model = get_network_generator_resnet_zerofl()(fake_config)
+    # swat_model = get_network_generator_resnet_zerofl()(None)
     # swat_model.load_state_dict(generate_random_state_dict(
     # swat_model, seed=42, sparsity=0))
 

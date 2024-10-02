@@ -22,7 +22,7 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_zerofl.models import get_network_generator_resnet_swat
+from project.task.cifar_zerofl.models import get_network_generator_resnet_zerofl
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar_zerofl.dataset import get_dataloader_generators
@@ -144,7 +144,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 10,
             )
             return (
-                get_network_generator_resnet_swat(
+                get_network_generator_resnet_zerofl(
                     alpha=alpha,
                     sparsity=sparsity,
                     pruning_type=pruning_type,

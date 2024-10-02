@@ -22,7 +22,9 @@ in the chain specified by project.dispatch will be used.
 from pathlib import Path
 
 from omegaconf import DictConfig
-from project.task.cifar_powerprop.models import get_network_generator_resnet_powerprop
+from project.task.cifar_powerprop.models import (
+    get_network_generator_resnet_sparsyfed_no_act,
+)
 
 from project.task.default.dispatch import dispatch_config as dispatch_default_config
 from project.task.cifar_powerprop.dataset import (
@@ -146,7 +148,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 10,
             )
             return (
-                get_network_generator_resnet_powerprop(
+                get_network_generator_resnet_sparsyfed_no_act(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
                 ),
                 client_dataloader_gen,
@@ -162,7 +164,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             )
             alpha = cfg.get("task", {}).get("alpha", 4.0)
             return (
-                get_network_generator_resnet_powerprop(alpha=alpha),
+                get_network_generator_resnet_sparsyfed_no_act(alpha=alpha),
                 client_dataloader_gen,
                 fed_dataloater_gen,
             )
