@@ -1,0 +1,31 @@
+---
+project: sweeptry
+program: project.main
+name: sweeptry
+method: bayes
+
+metric:
+  goal: maximize
+  name: test_accuracy
+
+parameters:
+  task.alpha:
+    min: 1.0
+    max: 2.0
+  task.fit_config.run_config.learning_rate:
+    min: 0.001
+    max: 0.1
+  task.fit_config.run_config.epochs:
+    min: 1
+    max: 5
+  task.fit_config.dataloader_config.batch_size:
+    values: [16, 32, 64, 128]
+
+command:
+  - poetry
+  - run
+  - python
+  - -m
+  - ${program}
+  - --config-name=local_cifar_powerprop
+  - ${args_no_hyphens}

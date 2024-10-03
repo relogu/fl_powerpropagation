@@ -1,0 +1,79 @@
+#!/bin/bash
+#SBATCH -w ngongotaha
+#SBATCH --cpus-per-task=5
+#SBATCH --gres=gpu:1
+
+
+cd /nfs-share/ag2411/project/fl_powerpropagation 
+
+# SPECTRAL
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=-1.0 task.sparsity=0.000 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=-1.0 task.sparsity=0.900 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=-1.0 task.sparsity=0.950 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=-1.0 task.sparsity=0.990 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=-1.0 task.sparsity=0.995 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=-1.0 task.sparsity=0.999 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0
+
+# Continual Learning
+# RAY_DEDUP_LOGS=0 poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=0.1 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.00 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=0.1 wandb.setup.project=continual_learning
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.00 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=0.1 wandb.setup.project=continual_learning
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=0.1 wandb.setup.project=continual_learning
+# CIFAR10
+# LDA 1.0
+#  poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda 
+#  poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda 
+#  poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda 
+#  poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=10 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda 
+
+
+# RAY_DEDUP_LOGS=0 poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda task.eval_config.extra.window_training=False
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=2035 task.alpha=1.25 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavgFLASH dataset.num_classes=10 dataset.lda_alpha=0.1 wandb.setup.project=continual_learning
+
+
+
+# CIFAR100
+# # LDA 1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.1 task.fit_config.run_config.final_learning_rate=0.1 fed.num_rounds=600 strategy=fedavgContinual dataset.num_classes=100 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda fed.num_evaluate_clients_per_round=5 fed.num_clients_per_round=5
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.1 task.fit_config.run_config.final_learning_rate=0.1 fed.num_rounds=600 strategy=fedavgContinual dataset.num_classes=100 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda fed.num_evaluate_clients_per_round=5 fed.num_clients_per_round=5
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.1 task.fit_config.run_config.final_learning_rate=0.1 fed.num_rounds=600 strategy=fedavgContinual dataset.num_classes=100 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda fed.num_evaluate_clients_per_round=5 fed.num_clients_per_round=5
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.1 task.fit_config.run_config.final_learning_rate=0.1 fed.num_rounds=600 strategy=fedavgContinual dataset.num_classes=100 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda fed.num_evaluate_clients_per_round=5 fed.num_clients_per_round=5
+
+
+# FLASH
+# poetry run python -m project.main --config-name=cluster_cifar_flash fed.seed=5378 task.sparsity=0.990 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.1 fed.num_rounds=600 strategy=fedavgCFLASH dataset.num_classes=100 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning task.eval_config.extra.window_training=True dataset=cluster_cifar_clustered_lda fed.num_evaluate_clients_per_round=5 fed.num_clients_per_round=5
+# PP
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.1 fed.num_rounds=500 strategy=fedavgContinual dataset.num_classes=100 dataset.lda_alpha=1.0 wandb.setup.project=continual_learning dataset=cluster_cifar_clustered_lda fed.num_evaluate_clients_per_round=5 fed.num_clients_per_round=5
+
+
+poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=2.750 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 dataset.num_classes=10 dataset.lda_alpha=1.0 wandb.setup.project=ablation_alpha_sensitivity
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=100 strategy=fedavgContinual dataset.num_classes=100 dataset.lda_alpha=0.1
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=9421 task.alpha=1.0 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=100 dataset.lda_alpha=1000.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=2035 task.alpha=1.0 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=100 dataset.lda_alpha=1000.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=100 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=9421 task.alpha=1.25 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=100 dataset.lda_alpha=1.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=2035 task.alpha=1.25 task.sparsity=0.99 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=100 dataset.lda_alpha=1.0
+
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.999 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=0.1
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=9421 task.alpha=1.0 task.sparsity=0.999 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=0.1
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=2035 task.alpha=1.0 task.sparsity=0.999 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=700 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=0.1
+
+# LDA tests
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=0.005 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=0.001 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=0.01 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=0.05 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=0.1 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=0.5 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=1.0 # dataset.num_classes=100
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=200 strategy=fedavg dataset.lda_alpha=1000.0 # dataset.num_classes=100
+
+
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.25 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=300 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1000.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.25 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=300 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1000.0
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning task.alpha=1.0 task.sparsity=0.95 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=300 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=1000.0 strategy=fedavgNZ
+
+
+# in out Continual
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.0 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.1 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavg dataset.num_classes=100 dataset.lda_alpha=0.1 task.fit_config.run_config.epochs=10
+# poetry run python -m project.main --config-name=cluster_cifar_powerprop_pruning fed.seed=5378 task.alpha=1.25 task.sparsity=0.0 task.fit_config.run_config.learning_rate=0.5 task.fit_config.run_config.final_learning_rate=0.01 fed.num_rounds=500 strategy=fedavg dataset.num_classes=10 dataset.lda_alpha=0.1 task.fit_config.run_config.epochs=1

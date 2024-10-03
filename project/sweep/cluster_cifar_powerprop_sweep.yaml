@@ -1,0 +1,45 @@
+---
+project: sweeptry
+program: project.main
+name: sweep_powerprop_learning_rate_fixed
+method: bayes
+
+metric:
+  goal: maximize
+  name: test_accuracy
+
+parameters:
+  # task.alpha:
+  #   values: [1.0, 1.25, 1.35, 1.5]
+  # task.sparsity:
+  #   values: [0, 0.7, 0.9, 0.95]
+  # strategy:
+  #   values: [fedavgNZ, fedavgNZ_voting, fedavg]
+  task.fit_config.run_config.learning_rate:
+    values: [0.1, 0.2, 0.4, 0.3, 0.5, 0.7, 0.8, 0.9, 1.0]
+  # task.fit_config.run_config.final_learning_rate:
+  #    values: [0.01, 0.05]
+  # task.fit_config.extra.mask:
+  #   values: [true, false]
+  # task.fit_config.extra.noise:
+  #   values: [0.0, 0.1, 0.2]
+
+early_terminate:
+  type: hyperband
+  s: 2
+  eta: 3
+  max_iter: 200
+
+command:
+  - poetry
+  - run
+  - python
+  - -m
+  - ${program}
+  - --config-name=cluster_cifar_powerprop_pruning
+  - task.alpha=1.25
+  - task.sparsity=0.95
+  - fed.num_rounds=700
+  - dataset.lda_alpha=1000
+  - task.fit_config.run_config.final_learning_rate=0.01
+  - ${args_no_hyphens}

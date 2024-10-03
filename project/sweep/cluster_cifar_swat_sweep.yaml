@@ -1,0 +1,40 @@
+---
+project: sweeptry
+program: project.main
+name: sweep_cluster_swat
+method: bayes
+
+metric:
+  goal: maximize
+  name: test_accuracy
+
+parameters:
+  task.alpha:
+    values: [1.0, 1.5, 2.0, 4]
+  task.sparsity:
+    values: [0.5, 0.7, 0.9]
+  task.pruning_type:
+    values: [unstructured, structured_channel, structured_filter]
+  # add strategy dio can
+  task.fit_config.run_config.learning_rate:
+    min: 0.001
+    max: 0.1
+  task.fit_config.run_config.epochs:
+    min: 1
+    max: 5
+  task.fit_config.dataloader_config.batch_size:
+    values: [8, 16, 32, 64]
+  task.fit_config.extra.mask:
+    values: [true, false]
+  task.fit_config.extra.noise:
+    min: 0.0
+    max: 0.1
+
+command:
+  - poetry
+  - run
+  - python
+  - -m
+  - ${program}
+  - --config-name=cluster_cifar_swat
+  - ${args_no_hyphens}

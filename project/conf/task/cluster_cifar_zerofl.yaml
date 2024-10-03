@@ -1,0 +1,75 @@
+---
+# These strings are constants used by the dispatcher to select functionality at runtime
+# Please implement all behaviour in the task-level dispatch.py file and then add the dispatch functions to the top-level dispatch.py
+# Choose the model and dataset
+model_and_data: ZEROFL_RESNET
+# Choose the train, test and server fed_eval functions
+train_structure: CIFAR_ZEROFL_PRUNE
+
+# Add something like swat_config:
+alpha: 1.0
+sparsity: 0.9
+mask: 0.0
+pruning_type: unstructured
+
+# Client fit config
+fit_config:
+  # Net does not require any configuration
+  net_config: {}
+  # Dataloader requires batch_size
+  dataloader_config:
+    batch_size: 16
+  # The train function requires epochs and learning_rate
+  run_config:
+    epochs: 1
+    learning_rate: 0.1
+    final_learning_rate: 0.01
+    tot_rounds: 500
+  # No extra config
+  extra: {in_out_eval: false, mask: true, noise: 0.1}
+
+# Client eval config
+eval_config:
+  net_config: {}
+  # The testing function batch size can be as high as the GPU supports
+  dataloader_config:
+    batch_size: 256
+  # Unlike train, the mnist train function takes no parameters?
+  run_config: {}
+  extra: {mask: true}
+
+# Configuration for the federated testing function
+# Follows the same conventions as the client config
+fed_test_config:
+  net_config: {}
+  # The testing function batch size can be as high as the GPU supports
+  dataloader_config:
+    batch_size: 256
+  # Unlike train, the mnist train function takes no parameters?
+  run_config: {}
+  extra: {}
+
+# Configuration instructions for initial parameter 
+# generation
+net_config_initial_parameters: {}
+
+# The names of metrics you wish to aggregate
+fit_metrics:
+  - train_loss
+  - train_accuracy
+  - after_training_activation
+  - after_training_deactivation
+  - after_training_sparsity
+  - after_pruning_activation
+  - after_pruning_deactivation
+  - after_pruning_sparsity
+  - learning_rate
+  # - update_rate
+
+evaluate_metrics:
+  - test_accuracy
+  # - nomask_test_accuracy
+  # - nomask_loss
+  # - noalpha_loss
+  # - noalpha_test_accuracy
+  - sparsity
