@@ -8,14 +8,15 @@
 
 ## About this Template
 
-Federated Learning (FL) is a privacy-preserving machine learning paradigm that allows training models directly on local client data using local client resources. This template standardizes the FL research workflow at the [Cambridge ML Systems](https://mlsys.cst.cam.ac.uk/) based on three frameworks chosen for their flexibility and ease of use:
+For this work, a [template](https://github.com/camlsys/fl-project-template) created to standardize the FL research workflow at [Cambridge ML Systems](https://mlsys.cst.cam.ac.uk/) has been used. It is based on three frameworks selected for their flexibility and ease of use:
+
  - [Flower](https://github.com/adap/flower): The FL framework developed by [Flower Labs](https://flower.dev/) with contributions from [CaMLSys](https://mlsys.cst.cam.ac.uk/) members. 
  - [Hydra](https://github.com/facebookresearch/hydra): framework for managing experiments developed at Meta which automatically handles experimental configuration for Python.
  - [Wandb](https://wandb.ai/site): The MLOps platform developed for handling results storage, experiment tracking, reproducibility, and visualization.
 
 While these tools can be combined in an ad-hoc manner, this template intends to provide a unified and opinionated structure for achieving this while providing functionality that may not have been easily constructed from scratch. 
 
-### What this template does:
+<!-- ### What this template does:
  - Automatically handles client configuration for Flower in an opinionated manner using the [PyTorch](https://github.com/pytorch/pytorch) library. This is meant to reduce the task of FL simulation to the mere implementation of standard ML tasks combined with minimal configuration work. Specifically, clients are treated uniformly except for their data, model, and configuration.
     - A user only needs to provide:
         - A means of generating a model (e.g., a function which returns a PyTorch model) based on a received configuration (e.g., a Dict)
@@ -26,11 +27,11 @@ While these tools can be combined in an ad-hoc manner, this template intends to 
 - Automatically handles logging, saving, and checkpointing, which integrate natively and seamlessly with Wandb and Hydra. This enables sequential re-launches of the same job on clusters using time-limited schedulers.
 - Provides deterministic seeded client selection while taking into account the current checkpoint. 
 - Provides a static means of selecting which ML task to run using Hydra's config system without the drawbacks of the untyped mechanism provided by Hydra.
-- Enforces good coding standards by default using isort, black, docformatter, ruff and mypy integrated with [pre-commit](https://pre-commit.com/). [Pydantic](https://docs.pydantic.dev/latest/) is also used to validate configuration data for generating models, creating dataloaders, training clients, etc.
+- Enforces good coding standards by default using isort, black, docformatter, ruff and mypy integrated with [pre-commit](https://pre-commit.com/). [Pydantic](https://docs.pydantic.dev/latest/) is also used to validate configuration data for generating models, creating dataloaders, training clients, etc. 
 
 ### What this template does not do:
 - Provide off-the-shelf implementations of FL algorithms, ML tasks, datasets, or models beyond the MNIST example. For such functionality, please refer to the original [Flower](https://github.com/adap/flower) and [PyTorch](https://github.com/pytorch/pytorch).
-- Provide a means of running experiments on clusters as this depends on the cluster configuration.
+- Provide a means of running experiments on clusters as this depends on the cluster configuration. -->
 
 ## Setup
 
@@ -47,7 +48,7 @@ poetry run pre-commit run --all-files --hook-stage push
 
 
 
-> Note: these instructions rely on the MNIST task and assume specific dataset partitioning, model creation and dataloader instantiation procedure. We recommend following a similar structure in your own experiments. Please refer to the [Flower](https://flower.dev/docs/baselines/index.html) baselines for more examples. 
+<!-- > Note: these instructions rely on the MNIST task and assume specific dataset partitioning, model creation and dataloader instantiation procedure. We recommend following a similar structure in your own experiments. Please refer to the [Flower](https://flower.dev/docs/baselines/index.html) baselines for more examples.  -->
 
 Install the template using the setup.sh script:
 ```bash
@@ -62,7 +63,7 @@ If ``poetry``, ``pyenv``, and/or the correct python version are installed, they 
 > :warning: Run the `default` task to check that everything is installed correctly from the root ``fl-project-template``, not from the ``fl-project-template/project`` directory.
 
 ```bash
-poetry run python -m project.main --config-name=base
+poetry run python -m project.main --config-name=cifar_resnet18
 ```
 
 
@@ -71,24 +72,25 @@ If you have a cluster which may run multiple Ray simulator instances, you will n
 The default task should have created a folder in fl-project-template/outputs. This folder contains the results of the experiment. To log your experiments to wandb, log into wandb and then enable it via the command:
 
 ```bash
-poetry run python -m project.main --config-name=base use_wandb=true
+poetry run python -m project.main --config-name=cifar_resnet18 use_wandb=true
 ```
 
-Now you  can run the MNIST example by following these instructions:
-- Specify a ``dataset_dir`` and ``partition_dir`` in ``conf/dataset/mnist.yaml`` together with the ``num_clients``, the size of a clients validation set ``val_ratio``, a ``seed`` for partitioning. Additionally, you can also specify if the partition labels should be ``iid``, follow a ``power_law`` distribution or if the partition should ``balance`` the labels across clients. 
+Now you  can run the CIFAR example by following these instructions:
+- Specify a ``dataset_dir`` and ``partition_dir`` in ``conf/dataset/cifar_lda.yaml`` together with the ``num_clients``, the size of a clients validation set ``val_ratio``, a ``seed`` for partitioning, ``num_classes`` tu use CIFAR-10 or CIFAR-100. Additionally, you can also specify if the level of etherogeneity of the partitioned dataset using ``lda_alpha`` and setting ``lda`` as `true`.
 - Download and partition the dataset by running the following command from the root dir: 
     - ```bash 
-         poetry run python -m project.task.mnist_classification.dataset_preparation
+         poetry run python -m project.task.cifar_resent18.dataset_preparation
         ```
-- Specify which ``model_and_data``, ``train_structure``, and ``fit_config`` or ``eval_config`` to use in the ``conf/task/mnist.yaml file``. The defaults are a CNN, a simple classification training/testing loop, and configs controlling ``batch_size``, local client ``epochs``, and the ``learning_rate``. You can also specify which metrics to aggregate during fit/eval.
+- Specify which `model_and_data`, `train_structure`, and `fit_config` or `eval_config` to use in the `conf/task/cifar_resnet18.yaml` file. The default configuration is for `SparsyFed`, and the experiment can be modified by adjusting parameters such as `batch_size`, local client `epochs`, `learning_rate`, and other settings.
+
 - Run the experiment using the following command from the root dir: 
     - ```bash 
-        poetry run python -m project.main --config-name=mnist
+        poetry run python -m project.main --config-name=cifar_resnet18
         ```
 
 Once a complete experiment has run, you can continue it for a specified number of epochs by running the following command from the root dir to change the output directory to the previous one. 
 - ```bash 
-    poetry run python -m project.main --config-name=mnist reuse_output_dir=<path_to_your_output_directory>
+    poetry run python -m project.main --config-name=cifar_resnet18 reuse_output_dir=<path_to_your_output_directory>
     ```
 These are all the basic steps required to run a simple experiment. 
 
@@ -120,23 +122,26 @@ The the main packages of concern are:
     - ``models``: Offers functionality to lazily create a model based on a received configuration.
     - ``train_test``: Offers functionality to train a model on a given dataset. This includes the effective train/test functions together with the config generation functions for the fit/eval stages of FL. The federated evaluation test function, if provided, should also be specified here.
 
-Two tasks are already implemented:
-- ``default``: A task providing generic functionality that may be reused across tasks. It requires no data and provides a minimum example of what a task must provide for the FL training to execute. 
-- ``mnist_classification``: Uses the simple MNIST dataset with either a CNN or logistic regression model. 
+Three tasks are currently implemented:
+- `default`: A task that provides generic functionality, reusable across different tasks. It requires no data and serves as a minimal example of what a task must provide for the FL training to execute.
+- `cifar_resnet18`: Utilizes the CIFAR-10/100 dataset with a ResNet-18 model.
+- `speech_resnet18`: Utilizes the Google Speech Commands dataset with a ResNet-18 model.
 
-> :warning: Prefer changing only the task module when possible.
+For the latter two tasks (`cifar_resnet18` and `speech_resnet18`), several `model_and_data`, `train_structure`, and `federated_strategy` configurations have been implemented to support additional FL methods besides SparsyFed, such as: `Top-K`, `ZeroFL`, and `FLASH`.
 
+### Running a SparsyFed Experiment
 
+To run a simple experiment using SparsyFed, you can use the following command:
+- ```bash 
+    poetry run python -m project.main --config-name=cifar_resnet18 task.model_and_data=CIFAR_SPARSYFED_RESNET18 task.train_structure=CIFAR_RESNET18_PRUNE task.alpha=1.25 task.sparsity=0.95 strategy=fedavg task.fit_config.run_config.learning_rate=0.5
+
+<!-- > :warning: Prefer changing only the task module when possible. -->
+
+<!-- 
 ## Enabling Pre-commit CI
 
 To enable Continous Integration of your project via Pre-commit, all you need to do is allow pre-commit for a given repo from the [github marketplace](https://github.com/marketplace/pre-commit-ci/plan/MDIyOk1hcmtldHBsYWNlTGlzdGluZ1BsYW42MTI2#plan-6126). You should be aware that this is free only for public open-source repositories. 
 
 ## Long-term Public Projects
 
-If you intend your project to run over multiple years and it does not require a private repository, prefer forking this codebase and creating your project as a branch. This will allow you to keep up to date with the latest changes to the template by syncing the main branch and merging it into your private branch.
-
-## TO DO 
-
-- fixing the threshold in the swat module
-- reorder and divide the code. Powerprop, SWAT and maybe a combination of the two. In this way would be easer to run some exp
-- find a way to mesure pruning in powerprop
+If you intend your project to run over multiple years and it does not require a private repository, prefer forking this codebase and creating your project as a branch. This will allow you to keep up to date with the latest changes to the template by syncing the main branch and merging it into your private branch. -->

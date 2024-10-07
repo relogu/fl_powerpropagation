@@ -20,6 +20,7 @@ build/**
 data
 .vscode
 outputs/*
+run_scripts/*
 multirun/*
 wandb/*
 run_scripts/launch_template.sh

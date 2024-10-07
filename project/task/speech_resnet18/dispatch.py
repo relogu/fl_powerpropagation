@@ -75,11 +75,11 @@ def dispatch_train(
     ):
         alpha = cfg.get("task", {}).get(
             "alpha",
-            1.25,
+            1.0,
         )
         sparsity = cfg.get("task", {}).get(
             "sparsity",
-            0.95,
+            0.0,
         )
         # ZeroFL: the sparsity must be modified to include the mask
         mask = cfg.get("task", {}).get("mask", 0.0)
@@ -92,7 +92,7 @@ def dispatch_train(
         )
     elif (
         train_structure is not None
-        and train_structure.upper() == "SPEECH_RESNET18_FLASH"
+        and train_structure.upper() == "SPEECH_RESNET18_FIXED"
     ):
         alpha = cfg.get("task", {}).get(
             "alpha",
@@ -100,7 +100,7 @@ def dispatch_train(
         )
         sparsity = cfg.get("task", {}).get(
             "sparsity",
-            0.95,
+            0.0,
         )
         return (
             # train,
@@ -178,7 +178,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )
-        if client_model_and_data.upper() == "SPEECH_PP":
+        if client_model_and_data.upper() == "SPEECH_SPARSYFED_NO_ACT_RESNET18":
             return (
                 get_powerprop_resnet18(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
@@ -186,7 +186,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )
-        if client_model_and_data.upper() == "SPEECH_PPSWAT":
+        if client_model_and_data.upper() == "SPEECH_SPARSYFED_RESNET18":
             return (
                 get_powerswat_resnet18(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
@@ -194,7 +194,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )
-        if client_model_and_data.upper() == "SPEECH_ZERO":
+        if client_model_and_data.upper() == "SPEECH_ZEROFL_RESNET18":
             return (
                 get_zerofl_resnet18(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes

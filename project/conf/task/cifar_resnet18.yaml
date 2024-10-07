@@ -26,11 +26,10 @@ fit_config:
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1
-    learning_rate: 0.1
+    learning_rate: 0.5
     final_learning_rate: 0.01
     warmup: 0
     tot_rounds: 700
-  # No extra config
   extra: {window_training: false, in_out_eval: false, mask: false, noise: 0}
 
 # Client eval config

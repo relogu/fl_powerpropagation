@@ -2,17 +2,17 @@
 # These strings are constants used by the dispatcher to select functionality at runtime
 # Please implement all behaviour in the task-level dispatch.py file and then add the dispatch functions to the top-level dispatch.py
 # Choose the model and dataset
-model_and_data: SPEECH_RESNET18
-# model_and_data: SPEECH_PP
-# model_and_data: SPEECH_PPSWAT
-# model_and_data: SPEECH_ZERO
+# model_and_data: SPEECH_RESNET18
+# model_and_data: SPEECH_SPARSYFED_NO_ACT_RESNET18
+model_and_data: SPEECH_SPARSYFED_RESNET18
+# model_and_data: SPEECH_ZEROFL_RESNET18
 
 # Choose the train, test and server fed_eval functions
 train_structure: SPEECH_RESNET18_PRUNE
-# train_structure: SPEECH_RESNET18_FLASH
+# train_structure: SPEECH_RESNET18_FIXED
 
-alpha: 1.25
-sparsity: 0.9
+alpha: 1.0
+sparsity: 0.0
 mask: 0.0
 
 # Client fit config
@@ -25,7 +25,7 @@ fit_config:
   # The train function requires epochs and learning_rate
   run_config:
     epochs: 1
-    learning_rate: 0.1
+    learning_rate: 0.5
     final_learning_rate: 0.01
     warmup: 0
     tot_rounds: 500
@@ -58,17 +58,6 @@ fed_test_config:
 net_config_initial_parameters: {}
 
 # The names of metrics you wish to aggregate
-fit_metrics:
-  - train_loss
-  - train_accuracy
-  - learning_rate
-  # - update_rate
+fit_metrics: [train_loss, train_accuracy, learning_rate]
 
-evaluate_metrics:
-  - test_accuracy
-  - nomask_test_accuracy
-  - nomask_loss
-  # - noalpha_loss
-  # - noalpha_test_accuracy
-  - sparsity
-  - test_time
+evaluate_metrics: [test_accuracy, sparsity]

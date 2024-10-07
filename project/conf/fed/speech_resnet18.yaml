@@ -11,7 +11,7 @@ enable_resampling: false
 
 # Client resources
 cpus_per_client: 1
-gpus_per_client: 0.2
+gpus_per_client: 0.5
 
 # Seed for client selection
 seed: 9421
