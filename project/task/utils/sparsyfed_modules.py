@@ -31,34 +31,9 @@ from project.task.utils.drop import (
     drop_threshold,
     matrix_drop,
 )
+from project.task.utils.spectral_norm import SpectralNormHandler
 
 torch.autograd.set_detect_anomaly(True)
-
-
-def spectral_norm(
-    self_weight: torch.Tensor, num_iterations: int = 1, epsilon: float = 1e-12
-) -> torch.Tensor:
-    """Spectral Normalization with sign handling and stability check."""
-    weight = self_weight  # .detach()
-    sign_weight = torch.sign(weight)
-    weight_abs = weight.abs()
-
-    weight_mat = weight_abs.view(weight_abs.size(0), -1)
-    u = torch.randn(weight_mat.size(0), 1, device=weight.device)
-    v = torch.randn(weight_mat.size(1), 1, device=weight.device)
-
-    for _ in range(num_iterations):
-        v = F.normalize(torch.matmul(weight_mat.t(), u), dim=0)
-        u = F.normalize(torch.matmul(weight_mat, v), dim=0)
-
-    sigma = torch.matmul(u.t(), torch.matmul(weight_mat, v))
-    sigma = torch.clamp(sigma, min=epsilon)  # Ensure sigma is not too small
-
-    weight_normalized = (
-        weight_abs / sigma
-    )  # Normalize the weight by the largest singular value
-
-    return self_weight * weight_normalized.view_as(self_weight)
 
 
 def convolution_backward(
@@ -172,6 +147,7 @@ class SparsyFedLinear(nn.Module):
         self.b = bias
         self.weight = nn.Parameter(torch.empty(out_features, in_features))
         self.bias = nn.Parameter(torch.empty(out_features)) if self.b else None
+        self.spectral_norm_handler = SpectralNormHandler()
         self.sparsity = sparsity
 
     def __repr__(self):
@@ -186,7 +162,7 @@ class SparsyFedLinear(nn.Module):
         if self.alpha == 1.0:
             return weights
         elif self.alpha < 0:
-            return spectral_norm(weights)
+            return self.spectral_norm_handler.compute_weight_update(weights)
         return torch.sign(weights) * torch.pow(torch.abs(weights), self.alpha)
 
     def _call_sparsyfed_linear(self, input, weight) -> torch.Tensor:
@@ -202,7 +178,9 @@ class SparsyFedLinear(nn.Module):
         if self.alpha == 1.0:
             sparsyfed_weight = self.weight
         elif self.alpha < 0:
-            sparsyfed_weight = spectral_norm(self.weight)
+            sparsyfed_weight = self.spectral_norm_handler.compute_weight_update(
+                self.weight
+            )
         else:
             sparsyfed_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha
@@ -311,6 +289,7 @@ class SparsyFedConv2D(nn.Module):
         self.in_threshold = -1.0
         self.epoch = 0
         self.batch_idx = 0
+        self.spectral_norm_handler = SpectralNormHandler()
 
     def __repr__(self):
         return (
@@ -327,7 +306,7 @@ class SparsyFedConv2D(nn.Module):
         if self.alpha == 1.0:
             return weight
         if self.alpha < 0:
-            return spectral_norm(weight)
+            return self.spectral_norm_handler.compute_weight_update(weight)
         return torch.sign(weight) * torch.pow(torch.abs(weight), self.alpha)
 
     def _call_sparsyfed_conv2d(self, input, weight) -> torch.Tensor:
@@ -363,7 +342,9 @@ class SparsyFedConv2D(nn.Module):
         if self.alpha == 1.0:
             sparsyfed_weight = self.weight
         elif self.alpha < 0:
-            sparsyfed_weight = spectral_norm(self.weight)
+            sparsyfed_weight = self.spectral_norm_handler.compute_weight_update(
+                self.weight
+            )
         else:
             sparsyfed_weight = torch.sign(self.weight) * torch.pow(
                 torch.abs(self.weight), self.alpha

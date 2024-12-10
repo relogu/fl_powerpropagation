@@ -234,6 +234,7 @@ class Client(fl.client.NumPyClient):
         )
 
         metrics["sparsity"] = sparsity
+        metrics["cid"] = self.cid
 
         return loss, num_samples, metrics
 

@@ -69,10 +69,7 @@ def dispatch_train(
     )
 
     # Only consider not None and uppercase matches
-    if (
-        train_structure is not None
-        and train_structure.upper() == "SPEECH_RESNET18_PRUNE"
-    ):
+    if train_structure is not None and train_structure.upper() == "SPEECH_RN18_PRUNE":
         alpha = cfg.get("task", {}).get(
             "alpha",
             1.0,
@@ -90,10 +87,7 @@ def dispatch_train(
             test,
             get_fed_eval_fn,
         )
-    elif (
-        train_structure is not None
-        and train_structure.upper() == "SPEECH_RESNET18_FIXED"
-    ):
+    elif train_structure is not None and train_structure.upper() == "SPEECH_RN18_FIX":
         alpha = cfg.get("task", {}).get(
             "alpha",
             1.0,
@@ -172,13 +166,13 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
             "num_classes",
             35,
         )
-        if client_model_and_data.upper() == "SPEECH_RESNET18":
+        if client_model_and_data.upper() == "SPEECH_RN18":
             return (
                 get_resnet18(num_classes=num_classes),
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )
-        if client_model_and_data.upper() == "SPEECH_SPARSYFED_NO_ACT_RESNET18":
+        if client_model_and_data.upper() == "SPEECH_SPARSYFED_NA_RN18":
             return (
                 get_powerprop_resnet18(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
@@ -186,7 +180,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )
-        if client_model_and_data.upper() == "SPEECH_SPARSYFED_RESNET18":
+        if client_model_and_data.upper() == "SPEECH_SPARSYFED_RN18":
             return (
                 get_powerswat_resnet18(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes
@@ -194,7 +188,7 @@ def dispatch_data(cfg: DictConfig) -> DataStructure | None:
                 client_dataloader_gen,
                 fed_dataloader_gen,
             )
-        if client_model_and_data.upper() == "SPEECH_ZEROFL_RESNET18":
+        if client_model_and_data.upper() == "SPEECH_ZEROFL_RN18":
             return (
                 get_zerofl_resnet18(
                     alpha=alpha, sparsity=sparsity, num_classes=num_classes

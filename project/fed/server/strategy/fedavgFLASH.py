@@ -19,6 +19,7 @@ Paper: arxiv.org/abs/1602.05629
 
 
 from logging import WARNING
+from pathlib import Path
 from typing import Optional, Union
 from collections.abc import Callable
 
@@ -148,6 +149,7 @@ class FedAvgFLASH(Strategy):
         initial_parameters: Optional[Parameters] = None,
         fit_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
         evaluate_metrics_aggregation_fn: Optional[MetricsAggregationFn] = None,
+        # working_dir: Path,
     ) -> None:
         super().__init__()
 
@@ -169,6 +171,7 @@ class FedAvgFLASH(Strategy):
         self.initial_parameters = initial_parameters
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
+        # self.working_dir = working_dir
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""

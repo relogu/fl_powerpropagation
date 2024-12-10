@@ -54,6 +54,20 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 """
 
 
+class CidWindowCriterion:
+    """Custom criterion to select clients within a window."""
+
+    def __init__(self, upper_bound: int = 100, lower_bound: int = 0):
+        self.upper_bound = upper_bound
+        self.lower_bound = lower_bound
+
+    def select(self, client: ClientProxy, num_client: int = 100) -> bool:
+        # Assuming the client's cid is an integer or can be converted to an integer
+        return (
+            int(client.cid) < self.upper_bound and int(client.cid) >= self.lower_bound
+        )
+
+
 def original_aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     """Compute weighted average."""
     # Calculate the total number of examples used during training
@@ -121,7 +135,7 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
 
 
 # pylint: disable=line-too-long
-class FedAvgNZ(Strategy):
+class FedAvgHetero(Strategy):
     """Federated Averaging strategy.
 
     Implementation based on https://arxiv.org/abs/1602.05629
@@ -202,7 +216,10 @@ class FedAvgNZ(Strategy):
         self.initial_parameters = initial_parameters
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
+        # Hetero specific
         self.working_dir = working_dir
+        self.bounds = [(0, 40), (40, 70), (70, 100)]
+        self.sparsities: list[float] = []
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -249,16 +266,31 @@ class FedAvgNZ(Strategy):
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
+
+        # to-do: in flash, the mask must be applied to the parameters
         fit_ins = FitIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
             client_manager.num_available()
         )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
 
+        # to-do: - the clien must be sampled from different groups for differetn density
+        cluster_clients: list = [[] for _ in range(3)]
+        # remaining_clients = self.num_clients % 4
+        # Sample clients for each cluster
+        for idx, (lower_bound, upper_bound) in enumerate(self.bounds):
+            num_clients = int((upper_bound - lower_bound) / 10)
+            # Sample clients within the specified bounds
+            cluster_clients[idx] = client_manager.sample(
+                num_clients=num_clients,
+                min_num_clients=num_clients,
+                criterion=CidWindowCriterion(  # type: ignore[arg-type]
+                    upper_bound=upper_bound, lower_bound=lower_bound
+                ),
+            )
+        # aggregate all clients
+        clients = reduce(lambda x, y: x + y, cluster_clients)
         # Return client/config pairs
         return [(client, fit_ins) for client in clients]
 
@@ -275,16 +307,31 @@ class FedAvgNZ(Strategy):
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
+
+        # to-do: in flash, the mask must be applied to the parameters
         evaluate_ins = EvaluateIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_evaluation_clients(
             client_manager.num_available()
         )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
 
+        # to-do: - the clien must be sampled from different groups for differetn density
+        cluster_clients: list = [[] for _ in range(3)]
+        # remaining_clients = self.num_clients % 4
+        # Sample clients for each cluster
+        for idx, (lower_bound, upper_bound) in enumerate(self.bounds):
+            num_clients = int((upper_bound - lower_bound) / 10)
+            # Sample clients within the specified bounds
+            cluster_clients[idx] = client_manager.sample(
+                num_clients=num_clients,
+                min_num_clients=num_clients,
+                criterion=CidWindowCriterion(  # type: ignore[arg-type]
+                    upper_bound=upper_bound, lower_bound=lower_bound
+                ),
+            )
+        # aggregate all clients
+        clients = reduce(lambda x, y: x + y, cluster_clients)
         # Return client/config pairs
         return [(client, evaluate_ins) for client in clients]
 
@@ -307,6 +354,8 @@ class FedAvgNZ(Strategy):
             for _, fit_res in results
         ]
         parameters_aggregated = ndarrays_to_parameters(aggregate(weights_results))
+
+        # to-do: - in flash the masks for the models must be created here, 1st round
 
         # Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
@@ -337,7 +386,29 @@ class FedAvgNZ(Strategy):
             for _, evaluate_res in results
         ])
 
+        # to-do: - the accuracy for the different models density must be aggregated separately
+
         # Aggregate custom metrics if aggregation fn was provided
+        # metrics_aggregated = {}
+        # if self.evaluate_metrics_aggregation_fn:
+        #     eval_metrics = [(res.num_examples, res.metrics) for _, res in results]
+        #     metrics_aggregated = self.evaluate_metrics_aggregation_fn(eval_metrics)
+
+        #     cluster_bounds = [(0, 40), (40, 70), (70, 100)]
+        #     clusters_accuracy = [[] for _ in range(len(cluster_bounds))]
+
+        #     for _, metrics in eval_metrics:
+        #         for idx, cluster in enumerate(cluster_bounds):
+        #             if int(metrics["cid"]) in range(cluster[0], cluster[1]):
+        #                 clusters_accuracy[idx].append(metrics["test_accuracy"])
+
+        #     for idx, cluster_accuracy in enumerate(clusters_accuracy):
+        #         if cluster_accuracy:
+        #             metrics_aggregated[f"cluster_{idx}_accuracy"] = sum(cluster_accuracy) / len(cluster_accuracy)
+        # elif server_round == 1:  # Only log this warning once
+        #     log(WARNING, "No evaluate_metrics_aggregation_fn provided")
+
+        # (CLASSIC) Aggregate custom metrics if aggregation fn was provided
         metrics_aggregated = {}
         if self.evaluate_metrics_aggregation_fn:
             eval_metrics = [(res.num_examples, res.metrics) for _, res in results]

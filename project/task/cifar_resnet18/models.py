@@ -2,6 +2,9 @@
 
 from copy import deepcopy
 from collections.abc import Callable, Iterable
+import logging
+from flwr.common.logger import log
+
 import numpy as np
 
 import torch
@@ -17,6 +20,7 @@ from project.task.utils.sparsyfed_no_act_modules import (
     SparsyFed_no_act_linear,
 )
 
+from project.task.utils.spectral_norm import SpectralNormHandler
 from project.task.utils.swat_modules import SWATConv2D as ZeroflSwatConv2D
 from project.task.utils.swat_modules import SWATLinear as ZeroflSwatLinear
 
@@ -443,3 +447,82 @@ def get_parameters_to_prune(
     add_immediate_child(net, "Net")
 
     return parameters_to_prune
+
+
+def set_spectral_exponent(net: nn.Module, apply: bool = False) -> float:
+    """Compute the average spectral exponent across all layers.
+
+    Then set this value as the alpha for all custom layers in the network.
+
+    Parameters
+    ----------
+    net : nn.Module
+        The neural network module to process
+
+    Returns
+    -------
+    float
+        The average spectral exponent that was computed and set for all layers
+    """
+    spectral_handler = SpectralNormHandler()
+    exponents: list[float] = []
+
+    # First pass: compute exponents for all layers
+    def compute_layer_exponent(module: nn.Module) -> None:
+        """Compute the spectral exponent for a single layer."""
+        if isinstance(
+            module,
+            nn.Linear
+            | nn.Conv2d
+            | SparsyFedLinear
+            | SparsyFedConv2D
+            | SparsyFed_no_act_linear
+            | SparsyFed_no_act_Conv2D,
+        ):
+            # Get the weight tensor
+            weight = module.weight.data
+
+            # Compute the normalized weight using spectral norm
+            weight_normalized = spectral_handler._compute_spectral_norm(weight)
+
+            # Compute average of non-zero normalized weights
+            weight_normalized_avg = torch.mean(
+                weight_normalized[weight_normalized != 0]
+            )
+
+            # Compute exponent for this layer
+            exponent = 1 + weight_normalized_avg.item()
+            exponents.append(exponent)
+
+    # Apply first pass to collect all exponents
+    net.apply(compute_layer_exponent)
+
+    # Compute average exponent
+    if not exponents:
+        log(
+            logging.INFO, "No applicable layers found for spectral exponent computation"
+        )
+
+        return 1.0  # Default value if no layers processed
+
+    avg_exponent = sum(exponents) / len(exponents)
+    # avg_exponent = min(exponents)
+    log(logging.INFO, f"Average spectral exponent computed: {avg_exponent}")
+
+    # Second pass: set the average exponent for all custom layers
+    def set_layer_exponent(module: nn.Module) -> None:
+        """Set the computed average exponent for a layer."""
+        if isinstance(
+            module,
+            SparsyFedLinear
+            | SparsyFedConv2D
+            | SparsyFed_no_act_linear
+            | SparsyFed_no_act_Conv2D,
+        ) and hasattr(module, "alpha"):
+            module.alpha = avg_exponent
+
+    # Apply second pass to set the average exponent
+    if apply:
+        net.apply(set_layer_exponent)
+
+    return avg_exponent

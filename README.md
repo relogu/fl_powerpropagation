@@ -133,7 +133,7 @@ For the latter two tasks (`cifar_resnet18` and `speech_resnet18`), several `mode
 
 To run a simple experiment using SparsyFed, you can use the following command:
 - ```bash 
-    poetry run python -m project.main --config-name=cifar_resnet18 task.model_and_data=CIFAR_SPARSYFED_RESNET18 task.train_structure=CIFAR_RESNET18_PRUNE task.alpha=1.25 task.sparsity=0.95 strategy=fedavg task.fit_config.run_config.learning_rate=0.5
+    poetry run python -m project.main --config-name=cifar_resnet18 task.model_and_data=CIFAR_SPARSYFED_RN18 task.train_structure=CIFAR_RN18_PRUNE task.alpha=1.25 task.sparsity=0.95 strategy=fedavg task.fit_config.run_config.learning_rate=0.5
 
 <!-- > :warning: Prefer changing only the task module when possible. -->
 

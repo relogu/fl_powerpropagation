@@ -31,6 +31,8 @@ from project.task.speech_resnet18.dispatch import (
     dispatch_train as dispatch_speech_resnet18_train,
 )
 
+# ViT dispatch
+
 
 from project.types.common import ConfigStructure, DataStructure, TrainStructure
 
@@ -55,13 +57,6 @@ def dispatch_train(cfg: DictConfig) -> TrainStructure:
     """
     # Create the list of task dispatches to try
     task_train_functions: list[Callable[[DictConfig], TrainStructure | None]] = [
-        # dispatch_default_train,
-        # dispatch_cifar_train,
-        # dispatch_cifar_swat_train,
-        # dispatch_cifar_power_swat_train,
-        # dispatch_cifar_powerprop_train,
-        # dispatch_cifar_zeroFL_train,
-        # dispatch_cifar_flash_train,
         dispatch_resnet18_train,
         dispatch_speech_resnet18_train,
     ]
@@ -99,13 +94,6 @@ def dispatch_data(cfg: DictConfig) -> DataStructure:
     task_data_dependent_functions: list[
         Callable[[DictConfig], DataStructure | None]
     ] = [
-        # dispatch_default_data,
-        # dispatch_cifar_data,
-        # dispatch_cifar_powerprop_data,
-        # dispatch_cifar_swat_data,
-        # dispatch_cifar_power_swat_data,
-        # dispatch_cifar_zeroFL_data,
-        # dispatch_cifar_flash_data,
         dispatch_resnet18_data,
         dispatch_speech_resnet18_data,
     ]

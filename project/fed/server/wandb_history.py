@@ -133,8 +133,12 @@ class WandbHistory(History):
         )
         if self.use_wandb:
             for key in metrics:
+                if key == "test_accuracy":
+                    key_name = "distributed_test_accuracy"
+                else:
+                    key_name = key
                 wandb.log(
-                    {key: metrics[key]},
+                    {key_name: metrics[key]},
                     step=server_round,
                 )
 
@@ -162,7 +166,11 @@ class WandbHistory(History):
         )
         if self.use_wandb:
             for key in metrics:
+                if key == "test_accuracy":
+                    key_name = "centralised_test_accuracy"
+                else:
+                    key_name = key
                 wandb.log(
-                    {key: metrics[key]},
+                    {key_name: metrics[key]},
                     step=server_round,
                 )

@@ -6,6 +6,7 @@ dataset_dir: /datasets/CIFAR${dataset.num_classes}
 
 # Folder of client folders
 # indexed by id, containing train and test
+# partition_dir: /datasets/CIFAR${dataset.num_classes}/lda_${dataset.lda_alpha}_${dataset.num_clients}
 partition_dir: /datasets/CIFAR${dataset.num_classes}/lda_${dataset.lda_alpha}
 
 # How many clients to create

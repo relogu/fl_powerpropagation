@@ -30,7 +30,7 @@ save_frequency: 10
 to_clean_once: [history, parameters, yaml, log]
 
 # Control wandb logging
-use_wandb: false
+use_wandb: true
 
 # Test without Ray to to enable easy error detection
 test_clients:

@@ -20,6 +20,7 @@ Paper: arxiv.org/abs/1602.05629
 
 from logging import WARNING
 from pathlib import Path
+import pickle
 from typing import Optional, Union
 from collections.abc import Callable
 
@@ -54,47 +55,34 @@ than or equal to the values of `min_fit_clients` and `min_evaluate_clients`.
 """
 
 
-def original_aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
-    """Compute weighted average."""
-    # Calculate the total number of examples used during training
-    num_examples_total = sum([num_examples for _, num_examples in results])
+def create_binary_mask(
+    parameters: list[np.ndarray], target_sparsity: float
+) -> list[np.ndarray]:
+    """Create a binary mask for the given parameters with target sparsity."""
+    # Calculate total number of parameters
+    total_params = sum(layer.size for layer in parameters)
 
-    # Create a list of weights, each multiplied by the related number of examples
-    weighted_weights = [
-        [layer * num_examples for layer in weights] for weights, num_examples in results
-    ]
+    # Flatten all parameters and get their absolute values
+    all_values = np.concatenate([np.abs(layer).flatten() for layer in parameters])
 
-    # Compute average weights of each layer
-    weights_prime: NDArrays = [
-        reduce(np.add, layer_updates) / num_examples_total
-        for layer_updates in zip(*weighted_weights)
-    ]
-    return weights_prime
+    # Calculate threshold for target sparsity
+    k = int(total_params * (1 - target_sparsity))
+    threshold = np.partition(all_values, -k)[-k]
+
+    # Create masks for each layer
+    masks = []
+    for layer in parameters:
+        mask = np.where(np.abs(layer) >= threshold, 1.0, 0.0)
+        masks.append(mask.astype(np.float32))
+
+    return masks
 
 
-def old_aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
-    """Compute weighted average for non-zero weights."""
-    # Calculate the total number of examples used during training
-    num_examples_total = sum([num_examples for _, num_examples in results])
-
-    # Create a list of weights, each multiplied by the related number of examples
-    weighted_weights = [
-        [
-            (layer * num_examples).astype(bool) * layer for layer in weights
-        ]  # Modify this line
-        for weights, num_examples in results
-    ]
-
-    # Compute average weights of each layer
-    weights_prime: NDArrays = [
-        np.divide(
-            reduce(np.add, layer_updates),
-            num_examples_total,
-            where=(num_examples_total > 0),
-        )  # Modify this line
-        for layer_updates in zip(*weighted_weights)
-    ]
-    return weights_prime
+def verify_mask_sparsity(masks: list[np.ndarray]) -> float:
+    """Verify the sparsity level of the masks."""
+    total_params = sum(mask.size for mask in masks)
+    total_nonzero = sum(np.count_nonzero(mask) for mask in masks)
+    return 1 - (total_nonzero / total_params)
 
 
 def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
@@ -120,8 +108,34 @@ def aggregate(results: list[tuple[NDArrays, int]]) -> NDArrays:
     return weights_prime
 
 
+class CidWindowCriterion:
+    """Custom criterion to select clients within a window."""
+
+    def __init__(self, upper_bound: int = 100, lower_bound: int = 0):
+        self.upper_bound = upper_bound
+        self.lower_bound = lower_bound
+
+    def select(self, client: ClientProxy, num_client: int = 100) -> bool:
+        # Assuming the client's cid is an integer or can be converted to an integer
+        return (
+            int(client.cid) < self.upper_bound and int(client.cid) >= self.lower_bound
+        )
+
+
+def compute_layer_density(layer):
+    return np.count_nonzero(layer) / layer.size
+
+
+def topk_sparsify(layer, density):
+    k = int(density * layer.size)
+    if k >= layer.size:
+        return layer
+    threshold = np.partition(np.abs(layer).flatten(), -k)[-k]
+    return layer * (np.abs(layer) >= threshold)
+
+
 # pylint: disable=line-too-long
-class FedAvgNZ(Strategy):
+class FedAvgHFLASH(Strategy):
     """Federated Averaging strategy.
 
     Implementation based on https://arxiv.org/abs/1602.05629
@@ -202,7 +216,10 @@ class FedAvgNZ(Strategy):
         self.initial_parameters = initial_parameters
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
+        # Hetero specific
         self.working_dir = working_dir
+        self.bounds = [(0, 40), (40, 70), (70, 100)]
+        self.sparsities: list[float] = []
 
     def __repr__(self) -> str:
         """Compute a string representation of the strategy."""
@@ -249,16 +266,31 @@ class FedAvgNZ(Strategy):
         if self.on_fit_config_fn is not None:
             # Custom fit config function provided
             config = self.on_fit_config_fn(server_round)
+
+        # to-do: in flash, the mask must be applied to the parameters
         fit_ins = FitIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_fit_clients(
             client_manager.num_available()
         )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
 
+        # to-do: - the clien must be sampled from different groups for differetn density
+        cluster_clients: list = [[] for _ in range(3)]
+        # remaining_clients = self.num_clients % 4
+        # Sample clients for each cluster
+        for idx, (lower_bound, upper_bound) in enumerate(self.bounds):
+            num_clients = int((upper_bound - lower_bound) / 10)
+            # Sample clients within the specified bounds
+            cluster_clients[idx] = client_manager.sample(
+                num_clients=num_clients,
+                min_num_clients=num_clients,
+                criterion=CidWindowCriterion(  # type: ignore[arg-type]
+                    upper_bound=upper_bound, lower_bound=lower_bound
+                ),
+            )
+        # aggregate all clients
+        clients = reduce(lambda x, y: x + y, cluster_clients)
         # Return client/config pairs
         return [(client, fit_ins) for client in clients]
 
@@ -275,16 +307,31 @@ class FedAvgNZ(Strategy):
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(server_round)
+
+        # to-do: in flash, the mask must be applied to the parameters
         evaluate_ins = EvaluateIns(parameters, config)
 
         # Sample clients
         sample_size, min_num_clients = self.num_evaluation_clients(
             client_manager.num_available()
         )
-        clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients
-        )
 
+        # to-do: - the clien must be sampled from different groups for differetn density
+        cluster_clients: list = [[] for _ in range(3)]
+        # remaining_clients = self.num_clients % 4
+        # Sample clients for each cluster
+        for idx, (lower_bound, upper_bound) in enumerate(self.bounds):
+            num_clients = int((upper_bound - lower_bound) / 10)
+            # Sample clients within the specified bounds
+            cluster_clients[idx] = client_manager.sample(
+                num_clients=num_clients,
+                min_num_clients=num_clients,
+                criterion=CidWindowCriterion(  # type: ignore[arg-type]
+                    upper_bound=upper_bound, lower_bound=lower_bound
+                ),
+            )
+        # aggregate all clients
+        clients = reduce(lambda x, y: x + y, cluster_clients)
         # Return client/config pairs
         return [(client, evaluate_ins) for client in clients]
 
@@ -294,26 +341,77 @@ class FedAvgNZ(Strategy):
         results: list[tuple[ClientProxy, FitRes]],
         failures: list[Union[tuple[ClientProxy, FitRes], BaseException]],
     ) -> tuple[Optional[Parameters], dict[str, Scalar]]:
-        """Aggregate fit results using weighted average."""
+        """Aggregate fit results using weighted average and create sparsity masks in
+        first round."""
         if not results:
             return None, {}
-        # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
             return None, {}
 
-        # Convert results
         weights_results = [
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             for _, fit_res in results
         ]
-        parameters_aggregated = ndarrays_to_parameters(aggregate(weights_results))
 
-        # Aggregate custom metrics if aggregation fn was provided
+        # Create and save masks in the first round
+        if server_round == 1:
+            # Create masks directory
+            masks_dir = self.working_dir / "masks"
+            masks_dir.mkdir(parents=True, exist_ok=True)
+
+            # Get aggregated parameters first
+            aggregated_parameters = aggregate(weights_results)
+
+            # Create and save masks for each sparsity level
+            masks_dict = {}
+            for sparsity in self.sparsities:
+                # Calculate total parameters for global sparsity
+                weight_params = [p for p in aggregated_parameters if len(p.shape) > 1]
+                total_params = sum(param.size for param in weight_params)
+                all_values = np.concatenate([
+                    np.abs(param).flatten() for param in weight_params
+                ])
+                k = int(total_params * (1 - sparsity))
+                threshold = np.partition(all_values, -k)[-k]
+
+                # Create masks matching parameter structure
+                masks = []
+                for param in aggregated_parameters:
+                    if len(param.shape) > 1:  # Weight matrix
+                        mask = (np.abs(param) >= threshold).astype(np.float32)
+                    else:  # Bias vector
+                        mask = np.ones_like(param, dtype=np.float32)
+                    masks.append(mask)
+
+                # Save masks to file
+                mask_file = masks_dir / f"mask_sparsity_{sparsity:.2f}.pkl"
+                with open(mask_file, "wb") as f:
+                    pickle.dump(masks, f)
+
+                # Verify sparsity
+                achieved_sparsity = 1 - (
+                    sum(np.count_nonzero(m) for m in masks) / sum(m.size for m in masks)
+                )
+                print(
+                    f"Target sparsity: {sparsity:.4f}, Achieved sparsity:"
+                    f" {achieved_sparsity:.4f}"
+                )
+
+                masks_dict[sparsity] = masks
+
+            # Store masks in instance variable
+            self.masks = masks_dict
+
+            parameters_aggregated = ndarrays_to_parameters(aggregated_parameters)
+        else:
+            parameters_aggregated = ndarrays_to_parameters(aggregate(weights_results))
+
+        # Aggregate custom metrics
         metrics_aggregated = {}
         if self.fit_metrics_aggregation_fn:
             fit_metrics = [(res.num_examples, res.metrics) for _, res in results]
             metrics_aggregated = self.fit_metrics_aggregation_fn(fit_metrics)
-        elif server_round == 1:  # Only log this warning once
+        elif server_round == 1:
             log(WARNING, "No fit_metrics_aggregation_fn provided")
 
         return parameters_aggregated, metrics_aggregated

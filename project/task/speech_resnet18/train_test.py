@@ -291,7 +291,7 @@ def get_train_and_prune(
             )
             for module, name, _ in parameters_to_prune:
                 prune.remove(module, name)
-
+        torch.cuda.empty_cache()
         return metrics
 
     return train_and_prune
@@ -441,7 +441,7 @@ def test(
             correct += (predicted == labels).sum().item()
 
             # del images, labels, outputs, predicted
-
+    torch.cuda.empty_cache()
     return (
         per_sample_loss / len(cast(Sized, testloader.dataset)),
         len(cast(Sized, testloader.dataset)),
@@ -518,6 +518,7 @@ def get_fed_eval_fn(
 
         return loss, metrics
 
+    torch.cuda.empty_cache()
     return fed_eval_fn
 
 
