@@ -2,38 +2,20 @@
 requires = ["poetry-core>=1.4.0"]
 build-backend = "poetry.masonry.api"
 
-[tool.poetry]
-name = "project" # Do not change this
+
+[project]
+name = "sparsyfed"
+dynamic = ["classifiers", "dependencies", "requires-python"]
 version = "1.0.0"
-description = "Project"
-license = "Apache-2.0"
-authors = [""]
 readme = "README.md"
-# homepage = ""
-# documentation = ""
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: MacOS :: MacOS X",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Topic :: Scientific/Engineering",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Mathematics",
-    "Topic :: Software Development",
-    "Topic :: Software Development :: Libraries",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed",
+description = "SparsyFed: Sparse Adaptive Federated Training"
+license = "Apache-2.0"
+authors = [
+    { name = "Adriano Guastella", email = "adriano.guastella.57@gmail.com" },
+    { name = "Lorenzo Sani", email = "ls985@cam.ac.uk" },
+    { name = "Alexandru-Andrei Iacob", email = "aai30@cam.ac.uk" },
 ]
+
 
 [tool.poetry.dependencies]
 python = ">=3.9.17, <3.12.0"  # don't change this
@@ -67,9 +49,10 @@ gdown = "4.7.1"
 pydantic = "<2.0.0"
 pre-commit = "3.5.0"
 identify = "2.5.31"
+fvcore = "^0.1.5.post20221221"
 
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 black = { version = "==23.1.0", extras = ["jupyter"] }
 docformatter = "==1.7.5"
 mypy = "==1.6.1"
